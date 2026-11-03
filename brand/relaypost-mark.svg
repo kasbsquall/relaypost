@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Relaypost, monograma: la panza de la R es la curva de la pista y la pierna es el testigo</title>
+  <rect width="512" height="512" fill="#b14328"/>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="58">
+    <path d="M176 384 V136 H268 A76 76 0 0 1 268 288 H176" stroke="#f6f1eb"/>
+    <path d="M272 288 L352 380" stroke="#e9dd3c"/>
+  </g>
+</svg>
