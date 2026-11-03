@@ -78,11 +78,13 @@ export const CREATE_TAG_MUTATION = /* GraphQL */ `
   }
 `
 
-// Only tagIds is sent: mode is omitted, which per the schema keeps the post's
-// schedule, queue slot and custom time untouched.
+// mode is omitted, which per the schema keeps the post's schedule, queue slot and
+// custom time untouched; assets are omitted, which keeps them. text is sent back
+// unchanged: the live API rejected a tags-only edit on 3 Nov 2026 with "Post must
+// have either text or media" although the schema says omitting text keeps it.
 export const SET_POST_TAGS_MUTATION = /* GraphQL */ `
-  mutation SetPostTags($id: PostId!, $tagIds: [TagId!]) {
-    editPost(input: { id: $id, tagIds: $tagIds }) {
+  mutation SetPostTags($id: PostId!, $tagIds: [TagId!], $text: String) {
+    editPost(input: { id: $id, tagIds: $tagIds, text: $text }) {
       ... on PostActionSuccess { post { ...RelayPost } }
       ... on MutationError { message }
     }
@@ -151,4 +153,13 @@ export function syncFilters(
   if (tagIds.length) filters.push({ ...base, tags: { in: tagIds, isEmpty: false } })
   if (channelIds.length) filters.push({ ...base, channelIds })
   return filters
+}
+
+// Variables for SET_POST_TAGS_MUTATION, built from the post as Buffer last
+// returned it so the browser never decides the tag list or the text.
+export function tagEditVariables(post: Pick<BufferPost, 'id' | 'text' | 'tags'>, tagId: string, on: boolean): Record<string, unknown> {
+  const current = post.tags.map((t) => t.id)
+  const tagIds = on ? [...new Set([...current, tagId])] : current.filter((id) => id !== tagId)
+  // A media-only post has no text to send back; omitting it keeps the media.
+  return post.text ? { id: post.id, tagIds, text: post.text } : { id: post.id, tagIds }
 }

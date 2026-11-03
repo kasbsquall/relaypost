@@ -11,6 +11,7 @@ import {
   SET_POST_TAGS_MUTATION,
   TAGS_QUERY,
   syncFilters,
+  tagEditVariables,
   type BufferAccount,
   type BufferChannel,
   type BufferPost,
@@ -328,9 +329,10 @@ export class AccountDO extends DurableObject<Env> {
   }
 
   // Toggle a tag on one post from the queue view: adds or removes the tag in Buffer.
-  async setPostTag(postId: string, tagId: string, on: boolean, currentTagIds: string[]): Promise<BufferPost> {
-    const tagIds = on ? [...new Set([...currentTagIds, tagId])] : currentTagIds.filter((id) => id !== tagId)
-    const data = await this.call<{ editPost: { post?: BufferPost; message?: string } }>(SET_POST_TAGS_MUTATION, { id: postId, tagIds }, 'interactive')
+  async setPostTag(postId: string, tagId: string, on: boolean): Promise<BufferPost> {
+    const post = (await this.queue()).find((p) => p.id === postId)
+    if (!post) throw new Error('That post is no longer in your Buffer queue')
+    const data = await this.call<{ editPost: { post?: BufferPost; message?: string } }>(SET_POST_TAGS_MUTATION, tagEditVariables(post, tagId, on), 'interactive')
     if (!data.editPost.post) throw new Error(data.editPost.message ?? 'Buffer could not update the post')
     await this.ctx.storage.delete('queueCache')
     await this.sync('interactive')

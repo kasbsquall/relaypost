@@ -150,8 +150,8 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
     return json({ ok: true })
   }
   if (m === 'POST /api/posts/tag') {
-    const b = await body<{ postId: string; tagId: string; on: boolean; currentTagIds: string[] }>(request)
-    return json(await stub.setPostTag(b.postId, b.tagId, Boolean(b.on), Array.isArray(b.currentTagIds) ? b.currentTagIds : []))
+    const b = await body<{ postId: string; tagId: string; on: boolean }>(request)
+    return json(await stub.setPostTag(b.postId, b.tagId, Boolean(b.on)))
   }
   if (m === 'POST /api/logout') return json({ ok: true }, 200, { 'Set-Cookie': cookie(SESSION_COOKIE, '', 0) })
   if (m === 'POST /api/disconnect') {

@@ -50,3 +50,28 @@ describe('Post filters match PostsFiltersInput', () => {
     expect(q.syncFilters({ start: 0, end: 1 }, ['sent'], [], [])).toHaveLength(0)
   })
 })
+
+describe('tagEditVariables', () => {
+  const post = { id: 'p1', text: 'Roast day', tags: [{ id: 't1', name: 'Community', color: '#000' }] }
+
+  it('adds a tag and sends the current text back, as the live API requires', () => {
+    expect(q.tagEditVariables(post, 't2', true)).toEqual({ id: 'p1', tagIds: ['t1', 't2'], text: 'Roast day' })
+  })
+
+  it('removes only the given tag', () => {
+    expect(q.tagEditVariables(post, 't1', false)).toEqual({ id: 'p1', tagIds: [], text: 'Roast day' })
+  })
+
+  it('does not duplicate a tag that is already on the post', () => {
+    expect(q.tagEditVariables(post, 't1', true).tagIds).toEqual(['t1'])
+  })
+
+  it('omits text on a media-only post so the media is kept', () => {
+    expect(q.tagEditVariables({ ...post, text: '' }, 't2', true)).toEqual({ id: 'p1', tagIds: ['t1', 't2'] })
+  })
+
+  it('its variables coerce against EditPostInput', () => {
+    const editType = schema.getType('EditPostInput') as GraphQLInputType
+    expect(() => coerceInputValue(q.tagEditVariables(post, 't2', true), editType)).not.toThrow()
+  })
+})
