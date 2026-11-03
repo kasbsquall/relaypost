@@ -1,7 +1,7 @@
 // The post sheet and the two forms: add a destination, new rule.
 
 import { api, app, channelLabel, destOf, destinationsFor, loadQueue, loadState, play, renderAll, toast } from './app.js'
-import { dateShort, dayPhrase, destIcon, esc, hm, icon, serviceIcon, serviceName } from './format.js'
+import { dateShort, dayPhrase, destIcon, destKindName, esc, hm, icon, serviceIcon, serviceName } from './format.js'
 
 const TELEGRAM_POLL_MS = 3000
 const $ = (sel) => document.querySelector(sel)
@@ -59,7 +59,7 @@ function renderSheetDests(p, ch, due) {
   const box = $('#sheet-dests')
   const dests = app.state.destinations
   if (!dests.length) {
-    box.innerHTML = `<p class="notice">${icon('info')}<span>No destinations yet. Add a Discord or Telegram channel first.</span></p>
+    box.innerHTML = `<p class="notice">${icon('info')}<span>No destinations yet. Add a Discord, Telegram or Slack channel first.</span></p>
       <p><button class="btn baton-btn" type="button" data-act="add-dest">${icon('plus')}Add a destination</button></p>`
     return
   }
@@ -130,12 +130,14 @@ function selectTab(kind) {
   })
   $('#panel-discord').hidden = kind !== 'discord'
   $('#panel-telegram').hidden = kind !== 'telegram'
+  $('#panel-slack').hidden = kind !== 'slack'
 }
-destDialog.querySelectorAll('[role="tab"]').forEach((t) => {
+const destTabs = [...destDialog.querySelectorAll('[role="tab"]')]
+destTabs.forEach((t, i) => {
   t.addEventListener('click', () => selectTab(t.dataset.kind))
   t.addEventListener('keydown', (e) => {
     if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return
-    const other = destDialog.querySelector(`[role="tab"]:not([data-kind="${t.dataset.kind}"])`)
+    const other = destTabs[(i + (e.key === 'ArrowRight' ? 1 : destTabs.length - 1)) % destTabs.length]
     selectTab(other.dataset.kind)
     other.focus()
   })
@@ -144,30 +146,33 @@ destDialog.querySelectorAll('[role="tab"]').forEach((t) => {
 export function addDestinationDialog(kind = 'discord') {
   $('#discord-form').reset()
   $('#discord-error').hidden = true
+  $('#slack-form').reset()
+  $('#slack-error').hidden = true
   $('#tg-code-box').hidden = true
   $('#tg-error').hidden = true
   $('#tg-get').disabled = false
   $('#tg-bot').textContent = app.state.telegramBot ? `@${app.state.telegramBot}` : 'the Relaypost bot'
-  selectTab(kind === 'telegram' ? 'telegram' : 'discord')
+  selectTab(['telegram', 'slack'].includes(kind) ? kind : 'discord')
   if (sheet.open) sheet.close()
   destDialog.showModal()
 }
 
-$('#discord-form').addEventListener('submit', async (e) => {
+// Discord and Slack both connect by pasting an incoming webhook.
+const webhookSubmit = (kind) => async (e) => {
   e.preventDefault()
   const f = e.currentTarget
   const btn = f.querySelector('button[type="submit"]')
-  const err = $('#discord-error')
+  const err = $(`#${kind}-error`)
   err.hidden = true
   btn.disabled = true
   btn.lastChild.textContent = 'Sending a test message'
   try {
-    await api('/api/destinations/discord', 'POST', { label: f.label.value.trim(), webhookUrl: f.url.value.trim() })
+    await api(`/api/destinations/${kind}`, 'POST', { label: f.label.value.trim(), webhookUrl: f.url.value.trim() })
     await loadState()
     renderAll({ settled: true })
     destDialog.close()
     play('added')
-    toast('Discord connected. The test message is in the channel.')
+    toast(`${destKindName(kind)} connected. The test message is in the channel.`)
   } catch (ex) {
     err.hidden = false
     err.innerHTML = `${icon('warning-circle')}<span>${esc(ex.message)}</span>`
@@ -175,7 +180,9 @@ $('#discord-form').addEventListener('submit', async (e) => {
     btn.disabled = false
     btn.lastChild.textContent = 'Connect and send a test message'
   }
-})
+}
+$('#discord-form').addEventListener('submit', webhookSubmit('discord'))
+$('#slack-form').addEventListener('submit', webhookSubmit('slack'))
 
 $('#tg-get').addEventListener('click', async (e) => {
   const btn = e.currentTarget
@@ -241,7 +248,7 @@ export function newRuleDialog() {
   $('#rule-error').hidden = true
   f.channel.innerHTML = (app.channels ?? []).filter((c) => !c.isDisconnected)
     .map((c) => `<option value="${esc(c.id)}">${esc(serviceName(c.service))} · ${esc(c.displayName || c.name)}</option>`).join('')
-  f.dest.innerHTML = app.state.destinations.map((d) => `<option value="${esc(d.id)}">${esc(d.label)} (${d.kind === 'discord' ? 'Discord' : 'Telegram'})</option>`).join('')
+  f.dest.innerHTML = app.state.destinations.map((d) => `<option value="${esc(d.id)}">${esc(d.label)} (${destKindName(d.kind)})</option>`).join('')
   syncRuleKind()
   ruleDialog.showModal()
 }

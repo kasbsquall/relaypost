@@ -41,7 +41,9 @@ const SERVICE_NAMES = {
 }
 export const serviceIcon = (service) => SERVICE_ICONS[service] ?? 'globe'
 export const serviceName = (service) => SERVICE_NAMES[service] ?? service
-export const destIcon = (kind) => (kind === 'telegram' ? 'telegram-logo' : 'discord-logo')
+const DEST_KINDS = { discord: ['discord-logo', 'Discord'], telegram: ['telegram-logo', 'Telegram'], slack: ['slack-logo', 'Slack'] }
+export const destIcon = (kind) => (DEST_KINDS[kind] ?? DEST_KINDS.discord)[0]
+export const destKindName = (kind) => (DEST_KINDS[kind] ?? DEST_KINDS.discord)[1]
 
 const pad = (n) => String(n).padStart(2, '0')
 export const hm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`

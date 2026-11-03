@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { BufferPost } from '../src/buffer/queries'
-import { discordPayload, isDiscordWebhook, sendDiscord, sendTelegram, telegramMessage } from '../src/relay/deliver'
+import { discordPayload, isDiscordWebhook, isSlackWebhook, sendDiscord, sendSlack, sendTelegram, slackPayload, telegramMessage } from '../src/relay/deliver'
 
 function post(overrides: Partial<BufferPost> = {}): BufferPost {
   return {
@@ -68,5 +68,43 @@ describe('Telegram', () => {
     const result = await sendTelegram('TOKEN', '-100', post({ assets: [{ type: 'image', source: 'https://img.example/a.png', thumbnail: '' }] }), fetcher)
     expect(calls).toEqual(['sendPhoto', 'sendMessage'])
     expect(result.ok).toBe(true)
+  })
+})
+
+describe('Slack', () => {
+  it('accepts only real Slack incoming webhook URLs', () => {
+    expect(isSlackWebhook('https://hooks.slack.com/services/T01ABC/B02DEF/xYz123abc')).toBe(true)
+    expect(isSlackWebhook('https://hooks.slack.com.evil.example/services/T01/B02/x')).toBe(false)
+    expect(isSlackWebhook('http://hooks.slack.com/services/T01ABC/B02DEF/xYz123abc')).toBe(false)
+    expect(isSlackWebhook('https://hooks.slack.com/workflows/T01ABC/A02/123/abc')).toBe(false)
+  })
+
+  it('escapes Slack control characters so a post cannot ping the channel', () => {
+    const payload = slackPayload(post({ text: '<!channel> Tom & Jerry <https://x.example|click>' }))
+    const section = (payload.blocks as { text?: { text: string } }[])[0]!
+    expect(section.text!.text).toBe('&lt;!channel&gt; Tom &amp; Jerry &lt;https://x.example|click&gt;')
+    expect(String(payload.text)).not.toContain('<!channel>')
+  })
+
+  it('adds the image and a link back to the original', () => {
+    const payload = slackPayload(post({ assets: [{ type: 'image', source: 'https://img.example/a.png', thumbnail: '' }] }))
+    const blocks = payload.blocks as Record<string, unknown>[]
+    expect(blocks[1]).toMatchObject({ type: 'image', image_url: 'https://img.example/a.png' })
+    expect(JSON.stringify(blocks[2])).toContain('<https://www.linkedin.com/feed/update/urn:li:share:1|LinkedIn>')
+  })
+
+  it('keeps the section text inside the 3000 character limit', () => {
+    const payload = slackPayload(post({ text: 'x'.repeat(5000) }))
+    const section = (payload.blocks as { text?: { text: string } }[])[0]!
+    expect(section.text!.text.length).toBeLessThanOrEqual(3000)
+  })
+
+  it('marks 5xx as retryable and a removed channel as final', async () => {
+    const f5 = vi.fn(async () => new Response('', { status: 500 })) as unknown as typeof fetch
+    const f404 = vi.fn(async () => new Response('channel_not_found', { status: 404 })) as unknown as typeof fetch
+    expect((await sendSlack('https://hooks.slack.com/services/T1/B1/a', {}, f5)).retryable).toBe(true)
+    const gone = await sendSlack('https://hooks.slack.com/services/T1/B1/a', {}, f404)
+    expect(gone.retryable).toBe(false)
+    expect(gone.detail).toBe('Slack answered HTTP 404 (channel_not_found)')
   })
 })

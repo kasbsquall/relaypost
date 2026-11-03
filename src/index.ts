@@ -129,6 +129,10 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
     const b = await body<{ label?: string; webhookUrl?: string }>(request)
     return json(await stub.addDiscord(b.label ?? '', b.webhookUrl ?? ''))
   }
+  if (m === 'POST /api/destinations/slack') {
+    const b = await body<{ label?: string; webhookUrl?: string }>(request)
+    return json(await stub.addSlack(b.label ?? '', b.webhookUrl ?? ''))
+  }
   if (m === 'POST /api/destinations/telegram') {
     const b = await body<{ label?: string }>(request)
     const pending = await stub.startTelegram(b.label ?? '')

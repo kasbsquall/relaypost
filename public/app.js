@@ -3,7 +3,7 @@
 
 import { addDestinationDialog, newRuleDialog, openPostSheet } from './dialogs.js'
 import { example } from './example.js'
-import { ago, dateShort, dayPhrase, destIcon, esc, hm, icon, serviceIcon, serviceName, until, word } from './format.js'
+import { ago, dateShort, dayPhrase, destIcon, destKindName, esc, hm, icon, serviceIcon, serviceName, until, word } from './format.js'
 import { handoff, renderTrack } from './track.js'
 
 const STATE_POLL_MS = 20_000
@@ -124,7 +124,7 @@ function stations() {
     if (last?.status === 'delivered') lines.push({ cls: 'ok', icon: 'check-circle', text: `Last handoff +${handoffSeconds(last)} s, ${dayPhrase(new Date(last.deliveredAt))}` })
     else if (last?.status === 'failed') lines.push({ cls: 'fail', icon: 'warning-circle', text: 'Last handoff failed. See history.' })
     else lines.push({ icon: 'hourglass-medium', text: 'No handoffs yet' })
-    return { id: d.id, name: d.label, place: d.kind === 'discord' ? 'Discord channel' : 'Telegram channel', icon: destIcon(d.kind), lines }
+    return { id: d.id, name: d.label, place: `${destKindName(d.kind)} channel`, icon: destIcon(d.kind), lines }
   })
 }
 
@@ -152,7 +152,7 @@ function renderHead() {
       ? `The next one goes to ${next.dests.map((id) => destOf(id)?.label).filter(Boolean).join(' and ')} at ${hm(next.due)} ${dayPhrase(next.due)}, right after ${lanes().find((l) => l.id === next.laneId)?.name ?? 'Buffer'}.`
       : app.state.destinations.length
         ? 'None is set to relay yet. Open a post and turn on a destination, or add a rule.'
-        : 'Add a Discord or Telegram destination to start relaying.'
+        : 'Add a Discord, Telegram or Slack destination to start relaying.'
   }
   const name = app.state.account.name || 'your Buffer account'
   const live = (app.channels ?? []).filter((c) => !c.isDisconnected).length
@@ -236,8 +236,10 @@ function friendly(r) {
   let sub = d
   if (/Discord answered HTTP 404/.test(d)) sub = 'The webhook was deleted in Discord.'
   else if (/Discord answered HTTP (401|403)/.test(d)) sub = 'Discord no longer accepts this webhook.'
+  else if (/Slack answered HTTP (403|404|410)/.test(d)) sub = 'Slack no longer accepts this webhook, or the channel is gone.'
   else if (/chat not found|bot was kicked|not a member/i.test(d)) sub = 'The Relaypost bot is no longer in this channel.'
-  return { cls: 'fail', ic: 'warning-circle', head: 'Failed', sub, fix: /Discord answered HTTP (401|403|404)/.test(d) }
+  const fix = /Discord answered HTTP (401|403|404)/.test(d) ? 'discord' : /Slack answered HTTP (403|404|410)/.test(d) ? 'slack' : ''
+  return { cls: 'fail', ic: 'warning-circle', head: 'Failed', sub, fix }
 }
 
 function renderHistory(freshKeys = new Set()) {
@@ -254,7 +256,7 @@ function renderHistory(freshKeys = new Set()) {
       ? `<span class="race num" aria-label="${handoffSeconds(r)} seconds after its scheduled time">+${handoffSeconds(r)}<span class="u">s</span></span>`
       : r.status === 'waiting' ? `<span class="dash num">${hm(new Date(r.dueAt))}</span>` : '<span class="dash">No time</span>'
     const act = f.fix
-      ? `<button class="btn dark" type="button" data-act="add-dest" data-kind="discord">${icon('link')}Paste a new webhook</button>`
+      ? `<button class="btn dark" type="button" data-act="add-dest" data-kind="${f.fix}">${icon('link')}Paste a new webhook</button>`
       : /^https:\/\//.test(r.externalLink ?? '') ? `<a class="link" href="${esc(r.externalLink)}" target="_blank" rel="noopener">Original${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>` : ''
     const key = `${r.postId}:${r.destinationId}`
     return `<tr style="--i:${Math.min(i, 7)}"${freshKeys.has(key) ? ' data-fresh' : ''}>
@@ -289,7 +291,7 @@ function renderRules() {
 function renderDestinations() {
   const list = app.state.destinations
   $('#dest-list').innerHTML = list.map((d) => `<li class="item"><div>
-      <div class="item-when">${icon(destIcon(d.kind))}${d.kind === 'discord' ? 'Discord channel' : 'Telegram channel'} · added ${esc(dateShort(new Date(d.createdAt)))}</div>
+      <div class="item-when">${icon(destIcon(d.kind))}${destKindName(d.kind)} channel · added ${esc(dateShort(new Date(d.createdAt)))}</div>
       <div class="item-what">${esc(d.label)}</div></div>
     <button class="icon-btn" type="button" data-act="del-dest" data-id="${esc(d.id)}" aria-label="Remove ${esc(d.label)}">${icon('trash')}</button></li>`).join('')
   $('#dest-empty').hidden = list.length > 0

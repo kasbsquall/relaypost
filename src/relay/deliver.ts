@@ -131,3 +131,43 @@ export async function sendTelegram(
     return { ok: false, detail: 'Could not reach Telegram', retryable: true }
   }
 }
+
+// --- Slack: incoming webhooks (https://api.slack.com/messaging/webhooks)
+
+const SLACK_WEBHOOK = /^https:\/\/hooks\.slack\.com\/services\/[A-Z0-9]+\/[A-Z0-9]+\/[A-Za-z0-9]+$/
+const SLACK_SECTION_MAX = 3000
+
+export function isSlackWebhook(url: string): boolean {
+  return SLACK_WEBHOOK.test(url.trim())
+}
+
+// Slack reads <, > and & as control characters (links, @channel); escaping them keeps the post as plain text.
+function slackEscape(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+export function slackPayload(post: BufferPost): Record<string, unknown> {
+  const service = serviceName(post.channelService)
+  const text = clip(slackEscape(post.text), SLACK_SECTION_MAX)
+  const blocks: Record<string, unknown>[] = [{ type: 'section', text: { type: 'mrkdwn', text, verbatim: true } }]
+  const image = firstImage(post)
+  if (image) blocks.push({ type: 'image', image_url: image, alt_text: `Image from the ${service} post` })
+  const footer = post.externalLink ? `Also on <${post.externalLink}|${service}> · relayed by Relaypost` : `Also on ${service} · relayed by Relaypost`
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: footer }] })
+  return { text: clip(slackEscape(post.text), 280), blocks, unfurl_links: false, unfurl_media: false }
+}
+
+export async function sendSlack(webhookUrl: string, payload: Record<string, unknown>, fetcher: typeof fetch = fetch): Promise<DeliveryResult> {
+  try {
+    const res = await fetcher(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (res.ok) return { ok: true, detail: 'Posted to Slack', retryable: false }
+    const reason = (await res.text().catch(() => '')).slice(0, 60)
+    return { ok: false, detail: `Slack answered HTTP ${res.status}${reason ? ` (${reason})` : ''}`, retryable: res.status === 429 || res.status >= 500 }
+  } catch {
+    return { ok: false, detail: 'Could not reach Slack', retryable: true }
+  }
+}

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Relaypost</title>
-<meta name="description" content="What you schedule in Buffer also lands in your Telegram channel and your Discord server, at the same minute.">
+<meta name="description" content="What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, at the same minute.">
 <meta name="theme-color" content="#f4f4f1">
 <link rel="icon" href="/img/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -52,10 +52,10 @@
 <main class="for-landing" id="landing" tabindex="-1">
   <section class="hero rise" style="--b:0" aria-labelledby="hero-title">
     <div>
-      <h1 id="hero-title">What you schedule in Buffer also lands in <em>Telegram</em> and <em>Discord</em>, at the same minute.</h1>
+      <h1 id="hero-title">What you schedule in Buffer also lands in <em>Telegram</em>, <em>Discord</em> and <em>Slack</em>, at the same minute.</h1>
     </div>
     <div class="hero-act">
-      <p>Relaypost watches your Buffer queue. When Buffer publishes a post, the same text, image and link go to your Telegram channel and your Discord server a few seconds later. No copy and paste.</p>
+      <p>Relaypost watches your Buffer queue. When Buffer publishes a post, the same text, image and link go to your Telegram channel, your Discord server and your team's Slack a few seconds later. No copy and paste.</p>
       <a class="btn baton-btn big" href="/auth/start"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plugs"></use></svg>Connect Buffer</a>
       <p class="fine"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-info"></use></svg><span>Built on the Buffer API. Relaypost reads your scheduled posts. The only thing it writes is a tag on a post, when you turn a destination on for it.</span></p>
       <p class="connect-note" id="connect-note" role="alert" hidden><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-warning-circle"></use></svg><span></span></p>
@@ -71,7 +71,7 @@
   <ol class="legs rise" style="--b:2">
     <li><span class="leg-n">Leg 1</span><b>Buffer publishes</b><p>You keep scheduling in Buffer the way you do now.</p></li>
     <li><span class="leg-n">Leg 2</span><b>Relaypost takes the baton</b><p>A rule decides what goes where: everything from one channel, or posts with a tag.</p></li>
-    <li><span class="leg-n">Leg 3</span><b>Your community gets it</b><p>Discord through a webhook you paste, Telegram through the Relaypost bot. The history shows every handoff and how long it took.</p></li>
+    <li><span class="leg-n">Leg 3</span><b>Your community gets it</b><p>Discord and Slack through a webhook you paste, Telegram through the Relaypost bot. The history shows every handoff and how long it took.</p></li>
   </ol>
 </main>
 
@@ -144,7 +144,7 @@
           <div><h2 id="h-dest">Destinations</h2><p>Where your posts land after Buffer.</p></div>
           <button class="btn act" type="button" data-act="add-dest"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plus"></use></svg>Add</button>
         </div>
-        <p class="panel-empty" id="dest-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>No destinations yet. Add a Discord channel or a Telegram channel.</span></p>
+        <p class="panel-empty" id="dest-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>No destinations yet. Add a Discord, Telegram or Slack channel.</span></p>
         <ul class="list" id="dest-list"></ul>
       </section>
     </div>
@@ -190,6 +190,7 @@
     <div class="tabs" role="tablist" aria-label="Destination type">
       <button type="button" role="tab" data-kind="discord" aria-controls="panel-discord" aria-selected="true"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-discord-logo"></use></svg>Discord</button>
       <button type="button" role="tab" data-kind="telegram" aria-controls="panel-telegram" aria-selected="false" tabindex="-1"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-telegram-logo"></use></svg>Telegram</button>
+      <button type="button" role="tab" data-kind="slack" aria-controls="panel-slack" aria-selected="false" tabindex="-1"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-slack-logo"></use></svg>Slack</button>
     </div>
     <div id="panel-discord" role="tabpanel">
       <form class="form" id="discord-form">
@@ -212,6 +213,15 @@
         </span></li>
       </ol>
       <p class="notice fail" id="tg-error" role="alert" hidden></p>
+    </div>
+    <div id="panel-slack" role="tabpanel" hidden>
+      <form class="form" id="slack-form">
+        <label class="field">Name in Relaypost<input name="label" maxlength="60" placeholder="#marketing…" autocomplete="off"></label>
+        <label class="field">Webhook URL<input name="url" type="url" required placeholder="https://hooks.slack.com/services/…" autocomplete="off" spellcheck="false">
+          <small>In Slack: create an app at api.slack.com/apps, turn on Incoming Webhooks, Add New Webhook, pick the channel, copy the URL.</small></label>
+        <p class="notice fail" id="slack-error" role="alert" hidden></p>
+        <div><button class="btn baton-btn" type="submit"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>Connect and send a test message</span></button></div>
+      </form>
     </div>
   </div>
 </dialog>

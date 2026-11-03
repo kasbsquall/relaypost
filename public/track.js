@@ -158,7 +158,7 @@ function renderHorizontal(W, ctx) {
     o += stationHTML(d, `left:${st[i].x}px;top:${st[i].y}px;width:${stW}px;height:${st[i].h}px`)
   })
   if (!m) {
-    o += `<div class="zone-empty" style="left:${nowX + 96}px;top:${AX + 18}px;width:${zoneW - 112}px"><b>No destinations yet</b><span>Add a Discord channel or a Telegram channel and choose which posts hand off to it.</span><button type="button" class="btn baton-btn" data-act="add-dest">${icon('plus')}Add a destination</button></div>`
+    o += `<div class="zone-empty" style="left:${nowX + 96}px;top:${AX + 18}px;width:${zoneW - 112}px"><b>No destinations yet</b><span>Add a Discord, Telegram or Slack channel and choose which posts hand off to it.</span><button type="button" class="btn baton-btn" data-act="add-dest">${icon('plus')}Add a destination</button></div>`
   }
   o += `<span class="runner" style="left:${sx}px;top:${sy}px"></span>`
   return { svg: s, overlay: o, W, TH, start: [sx, sy], ends: Object.fromEntries(st.map((v) => [v.id, [v.x, v.y + v.h / 2]])) }

@@ -22,7 +22,7 @@ import {
 } from './buffer/queries'
 import type { Env } from './env'
 import { randomToken, seal, unseal } from './lib/crypto'
-import { discordPayload, isDiscordWebhook, sendDiscord, sendTelegram, type DeliveryResult } from './relay/deliver'
+import { discordPayload, isDiscordWebhook, isSlackWebhook, sendDiscord, sendSlack, sendTelegram, slackPayload, type DeliveryResult } from './relay/deliver'
 import {
   MAX_DELIVERY_ATTEMPTS,
   RETRY_DELAY_MS,
@@ -264,6 +264,15 @@ export class AccountDO extends DurableObject<Env> {
     return this.storeDestination('discord', label || 'Discord', url)
   }
 
+  async addSlack(label: string, webhookUrl: string): Promise<{ id: string }> {
+    const url = webhookUrl.trim()
+    if (!isSlackWebhook(url)) throw new Error('That is not a Slack incoming webhook URL')
+    await this.assertRoomForDestination()
+    const test = await sendSlack(url, { text: 'Relaypost is connected. Posts you route here will show up in this channel.' })
+    if (!test.ok) throw new Error(`Slack did not accept the test message (${test.detail})`)
+    return this.storeDestination('slack', label || 'Slack', url)
+  }
+
   // Step 1 of linking a Telegram channel: a one-time code the user posts in the
   // channel after adding the bot as admin. The Worker's webhook does step 2.
   async startTelegram(label: string): Promise<PendingTelegram> {
@@ -407,7 +416,11 @@ export class AccountDO extends DurableObject<Env> {
     if (!destination) return { ...relay, status: 'skipped', detail: 'The destination was removed' }
     const target = await unseal(destination.sealedTarget, this.env.TOKEN_KEY, 'destination')
     const result: DeliveryResult =
-      destination.kind === 'discord' ? await sendDiscord(target, discordPayload(post)) : await sendTelegram(this.env.TELEGRAM_BOT_TOKEN, target, post)
+      destination.kind === 'discord'
+        ? await sendDiscord(target, discordPayload(post))
+        : destination.kind === 'slack'
+          ? await sendSlack(target, slackPayload(post))
+          : await sendTelegram(this.env.TELEGRAM_BOT_TOKEN, target, post)
     const attempts = relay.attempts + 1
     if (result.ok) return { ...relay, status: 'delivered', attempts, detail: result.detail, externalLink: post.externalLink, deliveredAt: now }
     if (result.retryable && attempts < MAX_DELIVERY_ATTEMPTS) return { ...relay, attempts, detail: result.detail, checkAt: now + RETRY_DELAY_MS }
