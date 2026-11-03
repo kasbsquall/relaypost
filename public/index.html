@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Relaypost (probe)</title>
+  <style>
+    :root { --bg: #f4f1ea; --ink: #1d211f; --muted: #5c625e; }
+    body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; }
+    main { max-width: 760px; margin: 0 auto; }
+    button, a.button { font: inherit; padding: 8px 12px; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block; }
+    pre { white-space: pre-wrap; word-break: break-word; background: #fff; padding: 12px; border: 1px solid #d9d4c9; }
+    p { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Relaypost probe</h1>
+    <p>Development page for block 1 of the plan. The product interface replaces it.</p>
+    <p><a class="button" href="/auth/start">Connect Buffer</a> <button id="state">State</button> <button id="channels">Channels</button> <button id="queue">Queue</button> <button id="sync">Sync</button></p>
+    <pre id="out">Not loaded</pre>
+  </main>
+  <script>
+    const out = document.getElementById('out')
+    async function show(path, method = 'GET') {
+      out.textContent = 'Loading ' + path
+      const res = await fetch(path, { method, headers: { 'X-Relaypost': '1' } })
+      out.textContent = res.status + '\n' + JSON.stringify(await res.json(), null, 2)
+    }
+    document.getElementById('state').onclick = () => show('/api/state')
+    document.getElementById('channels').onclick = () => show('/api/channels')
+    document.getElementById('queue').onclick = () => show('/api/queue')
+    document.getElementById('sync').onclick = () => show('/api/sync', 'POST')
+    const reason = new URLSearchParams(location.search).get('connect')
+    if (reason) out.textContent = 'Connect result: ' + reason
+  </script>
+</body>
+</html>

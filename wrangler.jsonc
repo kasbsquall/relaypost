@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "relaypost",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "public",
+    "binding": "ASSETS",
+    "run_worker_first": ["/auth/*", "/callback", "/api/*"]
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "ACCOUNTS", "class_name": "AccountDO" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AccountDO"] }],
+  "observability": { "enabled": true },
+  "vars": {
+    "BUFFER_SCOPES": "account:read posts:read posts:write offline_access"
+  }
+  // Secrets (wrangler secret put, or .dev.vars locally):
+  // BUFFER_CLIENT_ID, BUFFER_CLIENT_SECRET, REDIRECT_URI, SESSION_SECRET,
+  // TOKEN_KEY, TELEGRAM_BOT_TOKEN
+}

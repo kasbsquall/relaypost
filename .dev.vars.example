@@ -1,0 +1,12 @@
+# Copy to .dev.vars (never commit it). Fill these in yourself.
+# App client from https://publish.buffer.com/settings/api (App Clients tab, private client)
+BUFFER_CLIENT_ID=
+BUFFER_CLIENT_SECRET=
+# Must match a redirect URI registered on the app client, character for character
+REDIRECT_URI=https://localhost:8787/callback
+# 32+ random bytes, hex. Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+SESSION_SECRET=
+# 32 random bytes, base64. Generate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+TOKEN_KEY=
+# From @BotFather
+TELEGRAM_BOT_TOKEN=

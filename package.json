@@ -1,0 +1,22 @@
+{
+  "name": "relaypost",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "What you schedule in Buffer also lands in your Telegram channel and Discord server, at the same minute.",
+  "scripts": {
+    "dev": "wrangler dev --local-protocol https --port 8787",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "probe": "node scripts/probe.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20261102.1",
+    "graphql": "^16.14.2",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7",
+    "wrangler": "^4.156.2"
+  }
+}
