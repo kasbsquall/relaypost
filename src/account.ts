@@ -10,6 +10,8 @@ import {
   POSTS_QUERY,
   SET_POST_TAGS_MUTATION,
   TAGS_QUERY,
+  QUEUE_STATUSES,
+  SYNC_STATUSES,
   syncFilters,
   tagEditVariables,
   type BufferAccount,
@@ -67,7 +69,6 @@ const MAX_DESTINATIONS = 10
 const MAX_RULES = 30
 // Requests kept in reserve for scheduled relays: on-demand calls stop before this.
 const RATE_RESERVE = 20
-const SYNC_STATUSES: PostStatus[] = ['scheduled', 'sending', 'sent', 'error', 'needs_approval']
 const RELAY_TAG_COLOR = '#2F6B4F'
 const TELEGRAM_CODE_TTL_MS = 30 * 60_000
 
@@ -222,7 +223,7 @@ export class AccountDO extends DurableObject<Env> {
     const now = Date.now()
     const { posts } = await this.fetchPosts(
       organizationId,
-      { status: ['scheduled', 'needs_approval'], dueAt: { start: new Date(now).toISOString(), end: new Date(now + SYNC_AHEAD_MS).toISOString() } },
+      { status: QUEUE_STATUSES, dueAt: { start: new Date(now).toISOString(), end: new Date(now + SYNC_AHEAD_MS).toISOString() } },
       'interactive',
     )
     await this.ctx.storage.put('queueCache', { at: now, posts })

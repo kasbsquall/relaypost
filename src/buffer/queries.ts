@@ -139,6 +139,12 @@ export interface BufferAccount {
   organizations: { id: string; name: string }[]
 }
 
+// needs_approval is left out on purpose: on 3 Nov 2026 the live API returned no
+// posts at all whenever needs_approval was in the status list, even though the
+// schema accepts it. A post waiting for approval is picked up once it is scheduled.
+export const SYNC_STATUSES: PostStatus[] = ['scheduled', 'sending', 'sent', 'error']
+export const QUEUE_STATUSES: PostStatus[] = ['scheduled']
+
 // Filters for one sync pass: one read for tag rules, one for channel rules.
 // PostsFiltersInput takes tags as a TagComparator ({ in, isEmpty }), not a list
 // of ids; test/queries.test.ts coerces these against the schema.

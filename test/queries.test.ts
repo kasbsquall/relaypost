@@ -75,3 +75,14 @@ describe('tagEditVariables', () => {
     expect(() => coerceInputValue(q.tagEditVariables(post, 't2', true), editType)).not.toThrow()
   })
 })
+
+describe('status filters', () => {
+  it('never ask for needs_approval, which empties the live API response', () => {
+    expect(q.SYNC_STATUSES).not.toContain('needs_approval')
+    expect(q.QUEUE_STATUSES).not.toContain('needs_approval')
+  })
+
+  it('sync still covers every state a relay decision needs', () => {
+    expect(q.SYNC_STATUSES).toEqual(expect.arrayContaining(['scheduled', 'sending', 'sent', 'error']))
+  })
+})
