@@ -261,7 +261,7 @@ blockquote{margin:18px 0 10px;font-size:17px;line-height:1.5;color:var(--ink);wh
 /* landing */
 .hero{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:56px;align-items:end;padding:56px 0 34px}
 .hero h1{margin:0;font:600 50px/1.04 var(--display);font-stretch:125%;letter-spacing:-.03em;text-wrap:balance}
-.hero h1 em{font-style:normal;color:var(--track)}
+.hero h1 em{font-style:normal}
 .hero p{margin:0;font-size:17px;line-height:1.55;color:var(--ink-2);max-width:520px}
 .hero-act{display:flex;flex-direction:column;gap:16px;align-items:flex-start}
 .fine{font-size:13px;color:var(--ink-3);display:flex;gap:7px;align-items:flex-start}
@@ -331,7 +331,8 @@ footer.foot{max-width:1440px;margin:0 auto;padding:28px 32px 40px;font-size:13px
   td.time-cell{grid-column:2;grid-row:1/3;align-self:center}
   td.post-cell,td.to-cell,td.st-cell{grid-column:1}
   td.row-act{grid-column:1/3;text-align:left}
-  .panel-h{padding:14px 16px}
+  .panel-h{padding:14px 16px;flex-wrap:wrap}
+  .panel-h .act{margin-left:0}
   .item{padding:14px 16px}
   .tabbar{display:grid;grid-template-columns:repeat(4,1fr);position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--surface);border-top:1px solid var(--line-2);padding:6px 6px calc(6px + env(safe-area-inset-bottom))}
   .tabbar a{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 0;text-decoration:none;font-size:11px;font-weight:500;color:var(--ink-2);border-radius:10px;-webkit-tap-highlight-color:transparent}

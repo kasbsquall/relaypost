@@ -113,7 +113,8 @@ function renderHorizontal(W, ctx) {
     posts.map((p) => ({ p, li: Math.max(0, lanes.findIndex((l) => l.id === p.laneId)), pos: x((p.due - now) / 36e5) })),
     TOKEN_W + 8,
   )
-  placed.forEach(({ li, pos }) => {
+  // Time marks on the lane edge only where the lane is short enough to read them with the pill.
+  if (LH <= 72) placed.forEach(({ li, pos }) => {
     s += `<line x1="${pos}" x2="${pos}" y1="${laneY(li) + LH - 9}" y2="${laneY(li) + LH}" stroke="var(--baton)" stroke-width="2"/>`
   })
 
