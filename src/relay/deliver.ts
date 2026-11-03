@@ -51,7 +51,7 @@ export function discordPayload(post: BufferPost): Record<string, unknown> {
   const image = firstImage(post)
   const embed: Record<string, unknown> = {
     description: clip(post.text, 4000),
-    color: 0x2f6b4f,
+    color: 0xb14328,
     footer: { text: `Also on ${serviceName(post.channelService)} · relayed by Relaypost` },
   }
   if (post.externalLink) {

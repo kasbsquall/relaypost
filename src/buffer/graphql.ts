@@ -9,6 +9,8 @@ export interface RateWindow {
   policy: string
   remaining: number
   resetSeconds: number
+  // From RateLimit-Policy when Buffer sends it (q=), so the UI can say "of 500".
+  limit?: number
 }
 
 export class BufferApiError extends Error {
@@ -26,11 +28,15 @@ export class BufferApiError extends Error {
 //   RateLimit: "150-in-15min";r=98;t=897, "600-in-1day";r=598;t=86397
 // The live API (3 Nov 2026) sends spaces after the semicolons:
 //   RateLimit: "15m"; r=96; t=839, "24h"; r=496; t=86339
-export function parseRateLimit(header: string | null): RateWindow[] {
+//   RateLimit-Policy: "15m"; q=100; w=900, "24h"; q=500; w=86400
+export function parseRateLimit(header: string | null, policyHeader: string | null = null): RateWindow[] {
   if (!header) return []
+  const limits = new Map<string, number>()
+  for (const match of (policyHeader ?? '').matchAll(/"([^"]+)"\s*;\s*q=(\d+)/g)) limits.set(match[1]!, Number(match[2]))
   const windows: RateWindow[] = []
   for (const match of header.matchAll(/"([^"]+)"\s*;\s*r=(\d+)\s*;\s*t=(\d+)/g)) {
-    windows.push({ policy: match[1]!, remaining: Number(match[2]), resetSeconds: Number(match[3]) })
+    const limit = limits.get(match[1]!)
+    windows.push({ policy: match[1]!, remaining: Number(match[2]), resetSeconds: Number(match[3]), ...(limit ? { limit } : {}) })
   }
   return windows
 }
@@ -53,7 +59,7 @@ export async function graphql<T>(
     headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   })
-  const rateLimit = parseRateLimit(res.headers.get('RateLimit'))
+  const rateLimit = parseRateLimit(res.headers.get('RateLimit'), res.headers.get('RateLimit-Policy'))
 
   if (res.status === 401) throw new BufferApiError('Buffer rejected the access token', 401, 'UNAUTHENTICATED')
 

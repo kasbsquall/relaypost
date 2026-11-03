@@ -69,7 +69,7 @@ const MAX_DESTINATIONS = 10
 const MAX_RULES = 30
 // Requests kept in reserve for scheduled relays: on-demand calls stop before this.
 const RATE_RESERVE = 20
-const RELAY_TAG_COLOR = '#2F6B4F'
+const RELAY_TAG_COLOR = '#B14328'
 const TELEGRAM_CODE_TTL_MS = 30 * 60_000
 
 export class NotConnectedError extends Error {}

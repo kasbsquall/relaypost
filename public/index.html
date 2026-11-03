@@ -1,38 +1,239 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Relaypost (probe)</title>
-  <style>
-    :root { --bg: #f4f1ea; --ink: #1d211f; --muted: #5c625e; }
-    body { margin: 0; padding: 24px 16px; background: var(--bg); color: var(--ink); font: 15px/1.5 ui-monospace, Menlo, Consolas, monospace; }
-    main { max-width: 760px; margin: 0 auto; }
-    button, a.button { font: inherit; padding: 8px 12px; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; text-decoration: none; display: inline-block; }
-    pre { white-space: pre-wrap; word-break: break-word; background: #fff; padding: 12px; border: 1px solid #d9d4c9; }
-    p { color: var(--muted); }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Relaypost</title>
+<meta name="description" content="What you schedule in Buffer also lands in your Telegram channel and your Discord server, at the same minute.">
+<meta name="theme-color" content="#f4f4f1">
+<link rel="icon" href="/img/mark.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rethink+Sans:wght@400;500;600;700&family=Saira:wdth,wght@125,500;125,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/app.css">
+<style>
+  body:not([data-view="app"]) .for-app, body:not([data-view="landing"]) .for-landing { display: none !important; }
+</style>
+<script type="module" src="/app.js"></script>
 </head>
 <body>
-  <main>
-    <h1>Relaypost probe</h1>
-    <p>Development page for block 1 of the plan. The product interface replaces it.</p>
-    <p><a class="button" href="/auth/start">Connect Buffer</a> <button id="state">State</button> <button id="channels">Channels</button> <button id="queue">Queue</button> <button id="sync">Sync</button></p>
-    <pre id="out">Not loaded</pre>
-  </main>
-  <script>
-    const out = document.getElementById('out')
-    async function show(path, method = 'GET') {
-      out.textContent = 'Loading ' + path
-      const res = await fetch(path, { method, headers: { 'X-Relaypost': '1' } })
-      out.textContent = res.status + '\n' + JSON.stringify(await res.json(), null, 2)
-    }
-    document.getElementById('state').onclick = () => show('/api/state')
-    document.getElementById('channels').onclick = () => show('/api/channels')
-    document.getElementById('queue').onclick = () => show('/api/queue')
-    document.getElementById('sync').onclick = () => show('/api/sync', 'POST')
-    const reason = new URLSearchParams(location.search).get('connect')
-    if (reason) out.textContent = 'Connect result: ' + reason
-  </script>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="top">
+  <div class="top-in">
+    <a class="brand" href="/" translate="no"><img src="/img/mark.svg" alt="" width="28" height="28">Relaypost</a>
+    <nav class="nav for-app" aria-label="Sections">
+      <a href="#track">Track</a>
+      <a href="#history">History</a>
+      <a href="#rules">Rules</a>
+      <a href="#destinations">Destinations</a>
+    </nav>
+    <div class="top-right">
+      <div class="quota num for-app" id="quota" hidden><div class="meter" id="quota-meter" role="meter" aria-valuemin="0" aria-label="Buffer API calls left today" hidden><i></i></div><span id="quota-text"></span></div>
+      <div class="sync for-app">
+        <span class="label num" id="sync-label"></span>
+        <button class="icon-btn" type="button" id="sync-btn" aria-label="Sync with Buffer now"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-arrows-clockwise"></use></svg></button>
+      </div>
+      <button class="icon-btn for-app" type="button" id="sound" aria-pressed="true" aria-label="Sounds on"></button>
+      <details class="account for-app">
+        <summary aria-label="Account menu"><span class="avatar" id="acc-avatar" aria-hidden="true"></span><span class="acc-name" id="acc-name"></span><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-caret-down"></use></svg></summary>
+        <div class="menu">
+          <small>Connected through the Buffer API</small>
+          <button type="button" id="logout"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-sign-out"></use></svg><span>Log out on this device</span></button>
+          <button type="button" class="danger" id="disconnect"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plugs"></use></svg><span>Disconnect Buffer</span></button>
+        </div>
+      </details>
+      <a class="btn dark for-landing" href="/auth/start">Connect Buffer</a>
+    </div>
+  </div>
+</header>
+
+<!-- signed out -->
+<main class="for-landing" id="landing" tabindex="-1">
+  <section class="hero rise" style="--b:0" aria-labelledby="hero-title">
+    <div>
+      <h1 id="hero-title">What you schedule in Buffer also lands in <em>Telegram</em> and <em>Discord</em>, at the same minute.</h1>
+    </div>
+    <div class="hero-act">
+      <p>Relaypost watches your Buffer queue. When Buffer publishes a post, the same text, image and link go to your Telegram channel and your Discord server a few seconds later. No copy and paste.</p>
+      <a class="btn baton-btn big" href="/auth/start"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plugs"></use></svg>Connect Buffer</a>
+      <p class="fine"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-info"></use></svg><span>Built on the Buffer API. Relaypost reads your scheduled posts. The only thing it writes is a tag on a post, when you turn a destination on for it.</span></p>
+      <p class="connect-note" id="connect-note" role="alert" hidden><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-warning-circle"></use></svg><span></span></p>
+    </div>
+  </section>
+
+  <p class="example-cap rise" style="--b:1"><span class="example-tag">Example week</span>A small coffee shop's Buffer queue, as Relaypost draws it</p>
+  <section class="track on-track rise" style="--b:1" id="example-track" aria-label="Example week: posts from four Buffer channels move toward now; two of them hand off to Discord and Telegram">
+    <svg class="ground" aria-hidden="true"></svg>
+    <div class="overlay"></div>
+  </section>
+
+  <ol class="legs rise" style="--b:2">
+    <li><span class="leg-n">Leg 1</span><b>Buffer publishes</b><p>You keep scheduling in Buffer the way you do now.</p></li>
+    <li><span class="leg-n">Leg 2</span><b>Relaypost takes the baton</b><p>A rule decides what goes where: everything from one channel, or posts with a tag.</p></li>
+    <li><span class="leg-n">Leg 3</span><b>Your community gets it</b><p>Discord through a webhook you paste, Telegram through the Relaypost bot. The history shows every handoff and how long it took.</p></li>
+  </ol>
+</main>
+
+<!-- signed in -->
+<main class="for-app" id="app" tabindex="-1">
+  <section class="head rise" style="--b:0" aria-labelledby="statement">
+    <div>
+      <h1 class="statement" id="statement"><b id="lead-strong">Reading your Buffer queue.</b> <span id="lead-rest"></span></h1>
+      <p class="built" id="built"></p>
+    </div>
+    <div class="clock">
+      <div class="clock-label"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-timer"></use></svg>Next handoff</div>
+      <div class="clock-value num" id="clock-value"></div>
+      <div class="clock-sub num" id="clock-sub"></div>
+    </div>
+  </section>
+
+  <p class="phone-quota mobile-only num rise" style="--b:1" id="phone-quota"></p>
+
+  <div class="toolbar rise" style="--b:1">
+    <div class="seg" role="group" aria-label="How far ahead">
+      <button type="button" aria-pressed="true" data-h="168">Next 7 days</button>
+      <button type="button" aria-pressed="false" data-h="336">Next 14 days</button>
+    </div>
+    <ul class="legend" aria-label="Legend">
+      <li><span class="sw relay" aria-hidden="true"></span>Hands off</li>
+      <li><span class="sw only" aria-hidden="true"></span>Buffer only</li>
+    </ul>
+    <span class="scale-note"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-info"></use></svg>Nearer hours are drawn wider</span>
+  </div>
+
+  <section class="track on-track rise" style="--b:2" id="track" aria-label="Upcoming Buffer posts by channel, moving toward now. Select a post to choose where it hands off.">
+    <svg class="ground" aria-hidden="true"></svg>
+    <div class="overlay"></div>
+    <div class="track-error panel" hidden>
+      <p class="panel-empty" role="alert"></p>
+      <div style="padding:0 20px 18px"><button class="btn" type="button" data-act="retry-queue" id="retry-queue">Try again</button></div>
+    </div>
+  </section>
+
+  <div class="lower">
+    <section class="panel rise" style="--b:3" id="history" aria-labelledby="h-history">
+      <div class="panel-h">
+        <div>
+          <h2 id="h-history">Recent handoffs</h2>
+          <p>Time counts from the post's scheduled minute in Buffer.</p>
+        </div>
+        <button class="btn act" type="button" id="replay" hidden><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-play"></use></svg>Replay last handoff</button>
+      </div>
+      <p class="panel-empty" id="history-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-list-checks"></use></svg><span>No handoffs yet. When Buffer publishes a post that matches a rule, it shows up here with the time it took.</span></p>
+      <table id="history-table" hidden>
+        <thead><tr><th>Post</th><th>Went to</th><th style="text-align:right">Handoff</th><th>Result</th><th><span class="sr">Link</span></th></tr></thead>
+        <tbody id="results"></tbody>
+      </table>
+    </section>
+
+    <div class="side">
+      <section class="panel rise" style="--b:4" id="rules" aria-labelledby="h-rules">
+        <div class="panel-h">
+          <div><h2 id="h-rules">Rules</h2><p>What hands off where, without touching each post.</p></div>
+          <button class="btn act" type="button" data-act="new-rule"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plus"></use></svg>New rule</button>
+        </div>
+        <p class="panel-empty" id="rules-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-git-fork"></use></svg><span>No rules yet. Send everything from one Buffer channel, or only posts with a tag.</span></p>
+        <ul class="list" id="rules-list"></ul>
+        <p class="list-foot">A switch on a single post adds or removes its tag in Buffer.</p>
+      </section>
+
+      <section class="panel rise" style="--b:5" id="destinations" aria-labelledby="h-dest">
+        <div class="panel-h">
+          <div><h2 id="h-dest">Destinations</h2><p>Where your posts land after Buffer.</p></div>
+          <button class="btn act" type="button" data-act="add-dest"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plus"></use></svg>Add</button>
+        </div>
+        <p class="panel-empty" id="dest-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>No destinations yet. Add a Discord channel or a Telegram channel.</span></p>
+        <ul class="list" id="dest-list"></ul>
+      </section>
+    </div>
+  </div>
+</main>
+
+<footer class="foot">
+  <span>Relaypost is an independent app built on the Buffer API for Buffer Commit 2026. It is not made by Buffer.</span>
+  <span>Sounds: Kenney, CC0.</span>
+</footer>
+
+<nav class="tabbar for-app" aria-label="Sections">
+  <a href="#track"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-path"></use></svg>Track</a>
+  <a href="#history"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-list-checks"></use></svg>History</a>
+  <a href="#rules"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-git-fork"></use></svg>Rules</a>
+  <a href="#destinations"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg>Destinations</a>
+</nav>
+
+<dialog class="sheet" id="sheet" aria-labelledby="sheet-time">
+  <div class="sheet-in">
+    <div class="sheet-h"><span id="sheet-ch" style="display:flex;gap:8px;align-items:center;min-width:0"></span>
+      <button class="icon-btn" type="button" id="sheet-close" aria-label="Close"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-x"></use></svg></button>
+    </div>
+    <div class="sheet-b">
+      <p class="sheet-time num" id="sheet-time"></p>
+      <span class="badge"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-check-circle"></use></svg>Scheduled in Buffer</span>
+      <blockquote id="sheet-text"></blockquote>
+      <div class="meta" id="sheet-meta"></div>
+      <h3>Hands off to</h3>
+      <div id="sheet-dests"></div>
+    </div>
+    <div class="sheet-f">
+      <a class="btn" href="https://publish.buffer.com/" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-arrow-square-out"></use></svg>Edit the post in Buffer<span class="sr"> (opens in a new tab)</span></a>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="modal" id="dest-dialog" aria-labelledby="dest-title">
+  <div class="sheet-h"><h2 id="dest-title">Add a destination</h2>
+    <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-x"></use></svg></button>
+  </div>
+  <div class="sheet-b">
+    <div class="tabs" role="tablist" aria-label="Destination type">
+      <button type="button" role="tab" data-kind="discord" aria-controls="panel-discord" aria-selected="true"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-discord-logo"></use></svg>Discord</button>
+      <button type="button" role="tab" data-kind="telegram" aria-controls="panel-telegram" aria-selected="false" tabindex="-1"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-telegram-logo"></use></svg>Telegram</button>
+    </div>
+    <div id="panel-discord" role="tabpanel">
+      <form class="form" id="discord-form">
+        <label class="field">Name in Relaypost<input name="label" maxlength="60" placeholder="#announcements…" autocomplete="off"></label>
+        <label class="field">Webhook URL<input name="url" type="url" required placeholder="https://discord.com/api/webhooks/…" autocomplete="off" spellcheck="false">
+          <small>In Discord: channel settings, Integrations, Webhooks, New webhook, Copy webhook URL.</small></label>
+        <p class="notice fail" id="discord-error" role="alert" hidden></p>
+        <div><button class="btn baton-btn" type="submit"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>Connect and send a test message</span></button></div>
+      </form>
+    </div>
+    <div id="panel-telegram" role="tabpanel" hidden>
+      <ol class="steps">
+        <li><span>In Telegram, add <b id="tg-bot">the Relaypost bot</b> to your channel as an administrator that can post messages.</span></li>
+        <li><span>
+          <label class="field" style="margin-bottom:10px">Name in Relaypost (optional)<input id="tg-label" maxlength="60" placeholder="Uses the channel name…" autocomplete="off"></label>
+          <button class="btn dark" type="button" id="tg-get"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-link"></use></svg>Get a one-time code</button></span></li>
+        <li><span>Post the code in the channel. Relaypost sees it, deletes it and connects the channel. The code works for 30 minutes.
+          <span class="code" id="tg-code-box" hidden><output id="tg-code" class="num" aria-live="polite"></output>
+            <button class="icon-btn" type="button" id="tg-copy" aria-label="Copy the code"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-copy"></use></svg></button></span>
+        </span></li>
+      </ol>
+      <p class="notice fail" id="tg-error" role="alert" hidden></p>
+    </div>
+  </div>
+</dialog>
+
+<dialog class="modal" id="rule-dialog" aria-labelledby="rule-title">
+  <div class="sheet-h"><h2 id="rule-title">New rule</h2>
+    <button class="icon-btn" type="button" data-close aria-label="Close"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-x"></use></svg></button>
+  </div>
+  <form class="sheet-b form" id="rule-form">
+    <fieldset class="field" style="border:0;padding:0;margin:0">
+      <legend style="margin-bottom:8px">What hands off</legend>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="radio" name="kind" value="channel" checked>Everything from a Buffer channel</label>
+      <label style="display:flex;gap:8px;align-items:center;font-weight:400"><input type="radio" name="kind" value="tag">Only posts with a tag</label>
+    </fieldset>
+    <label class="field" id="rule-channel-field">Buffer channel<select name="channel"></select></label>
+    <label class="field" id="rule-tag-field" hidden>Tag<input name="tag" maxlength="40" placeholder="Community…" autocomplete="off">
+      <small>If the tag does not exist in Buffer yet, Relaypost creates it.</small></label>
+    <label class="field">Goes to<select name="dest"></select></label>
+    <p class="notice fail" id="rule-error" role="alert" hidden></p>
+    <div><button class="btn baton-btn" type="submit"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-check"></use></svg>Save rule</button></div>
+  </form>
+</dialog>
+
 </body>
 </html>

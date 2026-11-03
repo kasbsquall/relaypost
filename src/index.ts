@@ -121,7 +121,7 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
   const stub = accountStub(env, accountId)
   const m = `${request.method} ${path}`
 
-  if (m === 'GET /api/state') return json(await stub.state())
+  if (m === 'GET /api/state') return json({ ...(await stub.state()), telegramBot: env.TELEGRAM_BOT_USERNAME })
   if (m === 'GET /api/channels') return json(await stub.channels())
   if (m === 'GET /api/queue') return json(await stub.queue())
   if (m === 'POST /api/sync') return json(await stub.manualSync())
