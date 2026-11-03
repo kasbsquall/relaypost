@@ -110,8 +110,13 @@ function trackPosts() {
 function ruleSummary(destId) {
   const rules = app.state.rules.filter((r) => r.destinationId === destId)
   if (!rules.length) return 'No rule yet. Turn it on from a post.'
-  const parts = rules.map((r) => (r.match.kind === 'tag' ? `tag ${r.match.tagName}` : `all of ${channelLabel(channelOf(r.match.channelId))}`))
-  return `Takes ${parts.slice(0, 2).join(' and ')}${parts.length > 2 ? ` and ${parts.length - 2} more` : ''}`
+  const list = (items) => (items.length <= 3 ? items.slice(0, -1).join(', ') + (items.length > 1 ? ' and ' : '') + items.at(-1) : `${items.slice(0, 2).join(', ')} and ${items.length - 2} more`)
+  const channels = rules.filter((r) => r.match.kind === 'channel').map((r) => channelLabel(channelOf(r.match.channelId)))
+  const tags = rules.filter((r) => r.match.kind === 'tag').map((r) => r.match.tagName)
+  const parts = []
+  if (channels.length) parts.push(`all of ${list(channels)}`)
+  if (tags.length) parts.push(`posts tagged ${list(tags)}`)
+  return `Takes ${parts.join(', plus ')}`
 }
 
 const handoffSeconds = (r) => Math.max(0, Math.round((r.deliveredAt - r.dueAt) / 1000))

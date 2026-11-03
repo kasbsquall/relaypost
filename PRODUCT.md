@@ -2,7 +2,7 @@
 
 ## What it is
 
-What you schedule in Buffer also lands in your Telegram channel and your Discord server, at the same minute, without copy and paste. Built on the Buffer API for Buffer Commit 2026.
+What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, less than a minute later, without copy and paste. Built on the Buffer API for Buffer Commit 2026.
 
 ## Who it is for
 
@@ -19,7 +19,7 @@ Typical person: a creator who batches the week's posts in Buffer on Sunday night
 
 ## Real content available (no lorem ipsum)
 
-From the Buffer API, per connected account: account name and avatar; channels (name, service such as instagram, linkedin, threads, bluesky, mastodon, x, tiktok, pinterest, youtube; avatar; timezone; paused or disconnected); scheduled posts for the next 14 days (text, due time, channel, tags, image assets, status: scheduled, needs_approval, sending, sent, error); tags. From Relaypost: destinations (Discord or Telegram, label), rules, relay history (per post and destination: waiting, delivered, skipped, failed, with the reason and the link to the original post), and the shared Buffer rate limit remaining.
+From the Buffer API, per connected account: account name and avatar; channels (name, service such as instagram, linkedin, threads, bluesky, mastodon, x, tiktok, pinterest, youtube; avatar; timezone; paused or disconnected); scheduled posts for the next 14 days (text, due time, channel, tags, image assets, status: scheduled, sending, sent, error); tags. From Relaypost: destinations (Discord, Telegram or Slack, label), rules, relay history (per post and destination: waiting, delivered, skipped, failed, with the reason and the link to the original post), and the shared Buffer rate limit remaining.
 
 ## Voice
 
