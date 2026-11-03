@@ -360,6 +360,8 @@ export class AccountDO extends DurableObject<Env> {
   async manualSync(): Promise<{ syncedAt: number }> {
     const last = (await this.ctx.storage.get<number>('lastSyncAt')) ?? 0
     if (Date.now() - last < MANUAL_SYNC_COOLDOWN_MS) return { syncedAt: last }
+    // A channel just connected in Buffer should show up on the next manual sync, not ten minutes later.
+    await this.ctx.storage.delete('channelCache')
     await this.sync('interactive')
     return { syncedAt: Date.now() }
   }
