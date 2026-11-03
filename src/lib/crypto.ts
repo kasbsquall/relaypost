@@ -50,24 +50,27 @@ export async function verify(value: string, signature: string, secret: string): 
 }
 
 // AES-GCM with a fresh 12-byte IV per message. Output: base64url(iv || ciphertext).
+// `context` is bound as additional data, so a value sealed for one purpose
+// (oauth cookie, tokens, a destination) cannot be opened as another.
+export type SealContext = 'oauth' | 'tokens' | 'destination'
 async function aesKey(base64Key: string): Promise<CryptoKey> {
   const raw = fromBase64(base64Key)
   if (raw.length !== 32) throw new Error('TOKEN_KEY must be 32 bytes, base64-encoded')
   return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt'])
 }
 
-export async function seal(plaintext: string, base64Key: string): Promise<string> {
+export async function seal(plaintext: string, base64Key: string, context: SealContext): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
-  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(base64Key), encoder.encode(plaintext))
+  const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode(context) }, await aesKey(base64Key), encoder.encode(plaintext))
   const out = new Uint8Array(iv.length + cipher.byteLength)
   out.set(iv)
   out.set(new Uint8Array(cipher), iv.length)
   return toBase64Url(out)
 }
 
-export async function unseal(sealed: string, base64Key: string): Promise<string> {
+export async function unseal(sealed: string, base64Key: string, context: SealContext): Promise<string> {
   const bytes = fromBase64Url(sealed)
   const iv = bytes.slice(0, 12)
-  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await aesKey(base64Key), bytes.slice(12))
+  const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv, additionalData: encoder.encode(context) }, await aesKey(base64Key), bytes.slice(12))
   return decoder.decode(plain)
 }

@@ -6,10 +6,8 @@ export const ACCOUNT_QUERY = /* GraphQL */ `
   query Account {
     account {
       id
-      email
       name
       avatar
-      timezone
       organizations { id name }
     }
   }
@@ -134,9 +132,7 @@ export interface BufferChannel {
 
 export interface BufferAccount {
   id: string
-  email: string
   name: string | null
   avatar: string
-  timezone: string | null
   organizations: { id: string; name: string }[]
 }

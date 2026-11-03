@@ -8,7 +8,9 @@ import {
   decide,
   destinationsFor,
   nextAlarm,
+  prune,
   reconcile,
+  RETENTION_MS,
   type Relay,
   type Rule,
 } from '../src/relay/plan'
@@ -123,5 +125,14 @@ describe('nextAlarm', () => {
 
   it('sleeps when there are no rules and nothing waiting', () => {
     expect(nextAlarm([], T0, false)).toBeNull()
+  })
+})
+
+describe('prune', () => {
+  it('drops finished relays past retention and keeps anything still waiting', () => {
+    const [a, b] = reconcile([], [post()], rules, window)
+    const old = { ...a!, status: 'delivered' as const, dueAt: T0 - RETENTION_MS - 1 }
+    const waitingOld = { ...b!, dueAt: T0 - RETENTION_MS - 1 }
+    expect(prune([old, waitingOld], T0)).toEqual([waitingOld])
   })
 })

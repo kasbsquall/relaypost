@@ -7,17 +7,20 @@
   "assets": {
     "directory": "public",
     "binding": "ASSETS",
-    "run_worker_first": ["/auth/*", "/callback", "/api/*"]
+    "run_worker_first": ["/auth/*", "/callback", "/api/*", "/telegram/*"]
   },
   "durable_objects": {
-    "bindings": [{ "name": "ACCOUNTS", "class_name": "AccountDO" }]
+    "bindings": [
+      { "name": "ACCOUNTS", "class_name": "AccountDO" },
+      { "name": "REGISTRY", "class_name": "RegistryDO" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AccountDO"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AccountDO", "RegistryDO"] }],
   "observability": { "enabled": true },
   "vars": {
     "BUFFER_SCOPES": "account:read posts:read posts:write offline_access"
   }
   // Secrets (wrangler secret put, or .dev.vars locally):
   // BUFFER_CLIENT_ID, BUFFER_CLIENT_SECRET, REDIRECT_URI, SESSION_SECRET,
-  // TOKEN_KEY, TELEGRAM_BOT_TOKEN
+  // TOKEN_KEY, TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_WEBHOOK_SECRET
 }

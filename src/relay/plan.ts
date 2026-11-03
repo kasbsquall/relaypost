@@ -43,6 +43,9 @@ export const RETRY_DELAY_MS = 2 * 60_000
 export const GIVE_UP_AFTER_MS = 30 * 60_000
 export const SYNC_INTERVAL_MS = 30 * 60_000
 export const MAX_DELIVERY_ATTEMPTS = 3
+// Finished relays older than this are dropped: we keep only what the history view needs.
+export const RETENTION_MS = 14 * 86_400_000
+export const MAX_RELAYS_KEPT = 300
 
 export function relayKey(postId: string, destinationId: string): string {
   return `${postId}:${destinationId}`
@@ -150,4 +153,11 @@ export function nextAlarm(relays: readonly Relay[], lastSyncAt: number, hasRules
     if (soonest === null || relay.checkAt < soonest) soonest = relay.checkAt
   }
   return soonest
+}
+
+export function prune(relays: readonly Relay[], now: number): Relay[] {
+  return [...relays]
+    .filter((r) => r.status === 'waiting' || now - r.dueAt < RETENTION_MS)
+    .sort((a, b) => b.dueAt - a.dueAt)
+    .slice(0, MAX_RELAYS_KEPT)
 }

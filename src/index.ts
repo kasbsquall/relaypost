@@ -4,8 +4,9 @@ import { OAuthError, buildAuthorizeUrl, exchangeCode, type OAuthConfig } from '.
 import { ACCOUNT_QUERY, type BufferAccount } from './buffer/queries'
 import { missingConfig, type Env } from './env'
 import { pkceChallenge, randomToken, seal, sign, unseal, verify } from './lib/crypto'
+import { RegistryDO } from './registry'
 
-export { AccountDO }
+export { AccountDO, RegistryDO }
 
 const SESSION_COOKIE = 'rp_session'
 const OAUTH_COOKIE = 'rp_oauth'
@@ -33,12 +34,20 @@ function oauthConfig(env: Env): OAuthConfig {
   return { clientId: env.BUFFER_CLIENT_ID, clientSecret: env.BUFFER_CLIENT_SECRET, redirectUri: env.REDIRECT_URI.trim(), scopes: env.BUFFER_SCOPES }
 }
 
+// Session cookie: accountId.expiresAtSeconds.signature. The expiry is signed, so
+// a copied cookie stops working on schedule regardless of the browser's Max-Age.
+async function sessionCookie(accountId: string, env: Env): Promise<string> {
+  const payload = `${accountId}.${Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_S}`
+  return `${payload}.${await sign(payload, env.SESSION_SECRET)}`
+}
+
 async function sessionAccountId(request: Request, env: Env): Promise<string | null> {
   const raw = cookies(request).get(SESSION_COOKIE)
   if (!raw) return null
-  const [accountId, signature] = raw.split('.')
-  if (!accountId || !signature) return null
-  return (await verify(accountId, signature, env.SESSION_SECRET)) ? accountId : null
+  const [accountId, exp, signature] = raw.split('.')
+  if (!accountId || !exp || !signature) return null
+  if (Number(exp) * 1000 < Date.now()) return null
+  return (await verify(`${accountId}.${exp}`, signature, env.SESSION_SECRET)) ? accountId : null
 }
 
 function accountStub(env: Env, accountId: string) {
@@ -50,7 +59,7 @@ function accountStub(env: Env, accountId: string) {
 async function startAuth(env: Env): Promise<Response> {
   const state = randomToken(16)
   const verifier = randomToken(32)
-  const sealed = await seal(JSON.stringify({ state, verifier, exp: Date.now() + OAUTH_TTL_MS }), env.TOKEN_KEY)
+  const sealed = await seal(JSON.stringify({ state, verifier, exp: Date.now() + OAUTH_TTL_MS }), env.TOKEN_KEY, 'oauth')
   return new Response(null, {
     status: 302,
     headers: { Location: buildAuthorizeUrl(oauthConfig(env), state, await pkceChallenge(verifier)), 'Set-Cookie': cookie(OAUTH_COOKIE, sealed, OAUTH_TTL_MS / 1000) },
@@ -70,7 +79,7 @@ async function callback(request: Request, env: Env): Promise<Response> {
   if (!raw) return backHome('expired')
   let pending: { state: string; verifier: string; exp: number }
   try {
-    pending = JSON.parse(await unseal(raw, env.TOKEN_KEY))
+    pending = JSON.parse(await unseal(raw, env.TOKEN_KEY, 'oauth'))
   } catch {
     return backHome('expired')
   }
@@ -83,7 +92,7 @@ async function callback(request: Request, env: Env): Promise<Response> {
     const tokens = await exchangeCode(oauthConfig(env), code, pending.verifier)
     const { data } = await graphql<{ account: BufferAccount }>(tokens.accessToken, ACCOUNT_QUERY)
     await accountStub(env, data.account.id).link(tokens, data.account)
-    const session = `${data.account.id}.${await sign(data.account.id, env.SESSION_SECRET)}`
+    const session = await sessionCookie(data.account.id, env)
     const headers = new Headers({ Location: '/' })
     headers.append('Set-Cookie', cookie(OAUTH_COOKIE, '', 0))
     headers.append('Set-Cookie', cookie(SESSION_COOKIE, session, SESSION_MAX_AGE_S))
@@ -115,14 +124,16 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
   if (m === 'GET /api/state') return json(await stub.state())
   if (m === 'GET /api/channels') return json(await stub.channels())
   if (m === 'GET /api/queue') return json(await stub.queue())
-  if (m === 'POST /api/sync') return json({ ok: true, ...(await stub.sync()) })
+  if (m === 'POST /api/sync') return json(await stub.manualSync())
   if (m === 'POST /api/destinations/discord') {
     const b = await body<{ label?: string; webhookUrl?: string }>(request)
     return json(await stub.addDiscord(b.label ?? '', b.webhookUrl ?? ''))
   }
   if (m === 'POST /api/destinations/telegram') {
-    const b = await body<{ label?: string; channel?: string }>(request)
-    return json(await stub.addTelegram(b.label ?? '', b.channel ?? ''))
+    const b = await body<{ label?: string }>(request)
+    const pending = await stub.startTelegram(b.label ?? '')
+    await env.REGISTRY.get(env.REGISTRY.idFromName('global')).register(pending.code, accountId)
+    return json({ ...pending, bot: env.TELEGRAM_BOT_USERNAME })
   }
   if (request.method === 'DELETE' && path.startsWith('/api/destinations/')) {
     await stub.removeDestination(path.split('/').pop()!)
@@ -160,16 +171,40 @@ function errorResponse(err: unknown): Response {
   if ((err instanceof BufferApiError && err.status === 429) || /rate limit/i.test(text)) {
     return json({ error: 'rate_limited', message: 'Buffer asked us to slow down. Try again in a moment.', retryAfter: err instanceof BufferApiError ? err.retryAfterSeconds : undefined }, 429)
   }
-  const message = err instanceof Error ? err.message : 'Unexpected error'
-  console.error(JSON.stringify({ event: 'api_error', message }))
-  return json({ error: 'failed', message }, 400)
+  console.error(JSON.stringify({ event: 'api_error', message: text }))
+  // Messages written for people (Buffer's own, or ours) pass through; internal
+  // configuration or crypto errors do not.
+  const safe = /TOKEN_KEY|SESSION_SECRET|decrypt|operation-specific|undefined|TypeError/i.test(text) || !text ? 'Something went wrong on our side.' : text
+  return json({ error: 'failed', message: safe }, 400)
+}
+
+// --------------------------------------------------------------- Telegram
+
+// Step 2 of linking: the user posted their one-time code in the channel where
+// our bot is an admin. Only someone who can post there can produce this update.
+async function telegramWebhook(request: Request, env: Env): Promise<Response> {
+  if (request.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.TELEGRAM_WEBHOOK_SECRET) return new Response('forbidden', { status: 403 })
+  const update = (await request.json().catch(() => null)) as { channel_post?: { message_id: number; text?: string; chat: { id: number; type: string; title?: string } } } | null
+  const post = update?.channel_post
+  const code = post?.text?.match(/RP-[A-Z0-9]{8}/)?.[0]
+  if (!post || !code || post.chat.type !== 'channel') return new Response('ok')
+  const accountId = await env.REGISTRY.get(env.REGISTRY.idFromName('global')).consume(code)
+  if (!accountId) return new Response('ok')
+  const linked = await accountStub(env, accountId).finishTelegram(code, String(post.chat.id), post.chat.title ?? '')
+  if (linked) {
+    const base = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}`
+    const headers = { 'Content-Type': 'application/json' }
+    await fetch(`${base}/deleteMessage`, { method: 'POST', headers, body: JSON.stringify({ chat_id: post.chat.id, message_id: post.message_id }) }).catch(() => undefined)
+    await fetch(`${base}/sendMessage`, { method: 'POST', headers, body: JSON.stringify({ chat_id: post.chat.id, text: 'Relaypost is connected to this channel.' }) }).catch(() => undefined)
+  }
+  return new Response('ok')
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const missing = missingConfig(env)
-    if (missing.length && (url.pathname.startsWith('/auth') || url.pathname.startsWith('/api') || url.pathname === '/callback')) {
+    if (missing.length && (url.pathname.startsWith('/auth') || url.pathname.startsWith('/api') || url.pathname.startsWith('/telegram') || url.pathname === '/callback')) {
       console.error(JSON.stringify({ event: 'missing_config', missing }))
       return json({ error: 'misconfigured' }, 500)
     }
@@ -177,6 +212,7 @@ export default {
       if (url.pathname === '/auth/start' && request.method === 'GET') return startAuth(env)
       if (url.pathname === '/callback' && request.method === 'GET') return callback(request, env)
       if (url.pathname.startsWith('/api/')) return await api(request, env, url.pathname)
+      if (url.pathname === '/telegram/webhook' && request.method === 'POST') return await telegramWebhook(request, env)
       return env.ASSETS.fetch(request)
     } catch (err) {
       return errorResponse(err)

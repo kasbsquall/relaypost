@@ -10,3 +10,7 @@ SESSION_SECRET=
 TOKEN_KEY=
 # From @BotFather
 TELEGRAM_BOT_TOKEN=
+# The bot's @username without the @
+TELEGRAM_BOT_USERNAME=
+# Any random string; Telegram echoes it back so we know a webhook call is real
+TELEGRAM_WEBHOOK_SECRET=
