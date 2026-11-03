@@ -24,10 +24,12 @@ export class BufferApiError extends Error {
 
 // Header shape (developers.buffer.com/guides/api-limits.html):
 //   RateLimit: "150-in-15min";r=98;t=897, "600-in-1day";r=598;t=86397
+// The live API (3 Nov 2026) sends spaces after the semicolons:
+//   RateLimit: "15m"; r=96; t=839, "24h"; r=496; t=86339
 export function parseRateLimit(header: string | null): RateWindow[] {
   if (!header) return []
   const windows: RateWindow[] = []
-  for (const match of header.matchAll(/"([^"]+)";r=(\d+);t=(\d+)/g)) {
+  for (const match of header.matchAll(/"([^"]+)"\s*;\s*r=(\d+)\s*;\s*t=(\d+)/g)) {
     windows.push({ policy: match[1]!, remaining: Number(match[2]), resetSeconds: Number(match[3]) })
   }
   return windows
