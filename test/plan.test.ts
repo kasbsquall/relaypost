@@ -81,6 +81,17 @@ describe('reconcile', () => {
     expect(second.every((r) => r.status === 'waiting')).toBe(true)
   })
 
+  it('does not hand off a post that was due before its rule existed', () => {
+    const late: Rule[] = [{ id: 'r9', destinationId: 'd-slack', match: { kind: 'channel', channelId: 'ch-ig' }, createdAt: T0 + 3_600_000 }]
+    expect(reconcile([], [post({ status: 'sent' })], late, window)).toEqual([])
+    const next = post({ id: 'p2', dueAt: new Date(T0 + 2 * 3_600_000).toISOString() })
+    expect(reconcile([], [next], late, window)).toHaveLength(1)
+  })
+
+  it('treats rules saved before createdAt existed as covering every post', () => {
+    expect(reconcile([], [post()], rules, window)).toHaveLength(2)
+  })
+
   it('never reopens a delivered relay', () => {
     const delivered: Relay[] = reconcile([], [post()], rules, window).map((r) => ({ ...r, status: 'delivered' as const }))
     const again = reconcile(delivered, [post()], rules, window)

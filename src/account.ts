@@ -327,7 +327,7 @@ export class AccountDO extends DurableObject<Env> {
     }
     const duplicate = rules.find((r) => r.destinationId === destinationId && JSON.stringify(r.match) === JSON.stringify(resolved))
     if (duplicate) return duplicate
-    const rule: Rule = { id: `r_${randomToken(6)}`, destinationId, match: resolved }
+    const rule: Rule = { id: `r_${randomToken(6)}`, destinationId, match: resolved, createdAt: Date.now() }
     await this.ctx.storage.put('rules', [...rules, rule])
     await this.sync('interactive')
     return rule

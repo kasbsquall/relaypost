@@ -17,6 +17,8 @@ export interface Rule {
   id: string
   destinationId: string
   match: RuleMatch
+  // When the rule was saved (ms). Rules stored before this field existed have none.
+  createdAt?: number
 }
 
 export type RelayStatus = 'waiting' | 'delivered' | 'skipped' | 'failed'
@@ -51,14 +53,18 @@ export function relayKey(postId: string, destinationId: string): string {
   return `${postId}:${destinationId}`
 }
 
+function matches(post: BufferPost, rule: Rule): boolean {
+  const m = rule.match
+  return m.kind === 'tag' ? post.tags.some((t) => t.id === m.tagId) : m.channelId === post.channelId
+}
+
 export function destinationsFor(post: BufferPost, rules: readonly Rule[]): string[] {
-  const tagIds = new Set(post.tags.map((t) => t.id))
-  const ids = new Set<string>()
-  for (const rule of rules) {
-    const hit = rule.match.kind === 'tag' ? tagIds.has(rule.match.tagId) : rule.match.channelId === post.channelId
-    if (hit) ids.add(rule.destinationId)
-  }
-  return [...ids]
+  return [...new Set(rules.filter((rule) => matches(post, rule)).map((rule) => rule.destinationId))]
+}
+
+// A new rule hands off what comes next, never posts that were already due when it was saved.
+function dueAfterRule(post: BufferPost, dueAt: number, destinationId: string, rules: readonly Rule[]): boolean {
+  return rules.some((rule) => rule.destinationId === destinationId && matches(post, rule) && dueAt >= (rule.createdAt ?? 0))
 }
 
 function previewOf(post: BufferPost): string {
@@ -87,6 +93,10 @@ export function reconcile(
       seen.add(key)
       const prior = byKey.get(key)
       if (prior && prior.status !== 'waiting') continue
+      if (!prior && !dueAfterRule(post, dueAt, destinationId, rules)) {
+        seen.delete(key)
+        continue
+      }
       next.push({
         postId: post.id,
         destinationId,
