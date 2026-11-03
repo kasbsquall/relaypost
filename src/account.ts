@@ -10,10 +10,12 @@ import {
   POSTS_QUERY,
   SET_POST_TAGS_MUTATION,
   TAGS_QUERY,
+  syncFilters,
   type BufferAccount,
   type BufferChannel,
   type BufferPost,
   type BufferTag,
+  type PostStatus,
 } from './buffer/queries'
 import type { Env } from './env'
 import { randomToken, seal, unseal } from './lib/crypto'
@@ -64,7 +66,7 @@ const MAX_DESTINATIONS = 10
 const MAX_RULES = 30
 // Requests kept in reserve for scheduled relays: on-demand calls stop before this.
 const RATE_RESERVE = 20
-const SYNC_STATUSES = ['scheduled', 'sending', 'sent', 'error', 'needs_approval']
+const SYNC_STATUSES: PostStatus[] = ['scheduled', 'sending', 'sent', 'error', 'needs_approval']
 const RELAY_TAG_COLOR = '#2F6B4F'
 const TELEGRAM_CODE_TTL_MS = 30 * 60_000
 
@@ -353,11 +355,9 @@ export class AccountDO extends DurableObject<Env> {
       let truncated = false
       if (rules.length) {
         const { organizationId } = await this.profile()
-        const base = { status: SYNC_STATUSES, dueAt: { start: new Date(window.start).toISOString(), end: new Date(window.end).toISOString() } }
         const tagIds = [...new Set(rules.flatMap((r) => (r.match.kind === 'tag' ? [r.match.tagId] : [])))]
         const channelIds = [...new Set(rules.flatMap((r) => (r.match.kind === 'channel' ? [r.match.channelId] : [])))]
-        for (const filter of [tagIds.length ? { ...base, tagIds } : null, channelIds.length ? { ...base, channelIds } : null]) {
-          if (!filter) continue
+        for (const filter of syncFilters(window, SYNC_STATUSES, tagIds, channelIds)) {
           const page = await this.fetchPosts(organizationId, filter, kind)
           posts.push(...page.posts)
           truncated ||= page.truncated

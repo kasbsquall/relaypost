@@ -136,3 +136,19 @@ export interface BufferAccount {
   avatar: string
   organizations: { id: string; name: string }[]
 }
+
+// Filters for one sync pass: one read for tag rules, one for channel rules.
+// PostsFiltersInput takes tags as a TagComparator ({ in, isEmpty }), not a list
+// of ids; test/queries.test.ts coerces these against the schema.
+export function syncFilters(
+  window: { start: number; end: number },
+  statuses: PostStatus[],
+  tagIds: string[],
+  channelIds: string[],
+): Record<string, unknown>[] {
+  const base = { status: statuses, dueAt: { start: new Date(window.start).toISOString(), end: new Date(window.end).toISOString() } }
+  const filters: Record<string, unknown>[] = []
+  if (tagIds.length) filters.push({ ...base, tags: { in: tagIds, isEmpty: false } })
+  if (channelIds.length) filters.push({ ...base, channelIds })
+  return filters
+}
