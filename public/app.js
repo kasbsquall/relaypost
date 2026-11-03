@@ -142,7 +142,9 @@ function renderHead() {
     strong.textContent = 'Nothing is scheduled in Buffer for the next seven days.'
     rest.textContent = 'Posts you schedule there show up on this track.'
   } else {
-    strong.textContent = relayed.length === posts.length
+    strong.textContent = relayed.length === 0
+      ? `None of this week's ${word(posts.length).toLowerCase()} ${posts.length === 1 ? 'post hands' : 'posts hand'} off yet.`
+      : relayed.length === posts.length
       ? posts.length === 1 ? "This week's only post hands off to your community." : `All ${word(posts.length).toLowerCase()} of this week's posts hand off to your community.`
       : `${word(relayed.length)} of this week's ${word(posts.length).toLowerCase()} posts ${relayed.length === 1 ? 'hands' : 'hand'} off to your community.`
     const next = relayed[0]

@@ -77,7 +77,7 @@ function renderHorizontal(W, ctx) {
   const AX = 44
   // Few channels get taller lanes so the track keeps its weight on screen.
   const LH = n > 6 ? 62 : Math.max(72, Math.min(132, (260 - AX - 14) / n))
-  const TH = Math.max(AX + n * LH + 14, AX + stations.length * 104 + 24)
+  const TH = Math.max(AX + n * LH + 14, AX + stations.length * 104 + 24, stations.length ? 0 : AX + 196)
   const labelW = 196
   const zoneW = Math.min(380, Math.max(320, W * 0.27))
   const nowX = W - zoneW
@@ -158,7 +158,7 @@ function renderHorizontal(W, ctx) {
     o += stationHTML(d, `left:${st[i].x}px;top:${st[i].y}px;width:${stW}px;height:${st[i].h}px`)
   })
   if (!m) {
-    o += `<div class="zone-empty" style="left:${nowX + 24}px;top:${AX + 22}px;width:${zoneW - 48}px"><b>No destinations yet</b><span>Add a Discord channel or a Telegram channel and choose which posts hand off to it.</span><button type="button" class="btn baton-btn" data-act="add-dest">${icon('plus')}Add a destination</button></div>`
+    o += `<div class="zone-empty" style="left:${nowX + 96}px;top:${AX + 18}px;width:${zoneW - 112}px"><b>No destinations yet</b><span>Add a Discord channel or a Telegram channel and choose which posts hand off to it.</span><button type="button" class="btn baton-btn" data-act="add-dest">${icon('plus')}Add a destination</button></div>`
   }
   o += `<span class="runner" style="left:${sx}px;top:${sy}px"></span>`
   return { svg: s, overlay: o, W, TH, start: [sx, sy], ends: Object.fromEntries(st.map((v) => [v.id, [v.x, v.y + v.h / 2]])) }
