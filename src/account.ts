@@ -198,7 +198,7 @@ export class AccountDO extends DurableObject<Env> {
       destinations: destinations.map(({ id, kind, label, createdAt }) => ({ id, kind, label, createdAt })),
       pendingTelegram: pending && pending.expiresAt > Date.now() ? pending : null,
       rules: await this.list<Rule>('rules'),
-      relays: [...(await this.list<Relay>('relays'))].sort((a, b) => b.dueAt - a.dueAt).slice(0, 60),
+      relays: (await this.list<Relay>('relays')).filter((r) => !r.hidden).sort((a, b) => b.dueAt - a.dueAt).slice(0, 60),
       lastSyncAt: (await this.ctx.storage.get<number>('lastSyncAt')) ?? null,
       calls: (await this.ctx.storage.get<CallLog>('calls')) ?? { count: 0, rateLimit: [] },
     }
@@ -304,6 +304,12 @@ export class AccountDO extends DurableObject<Env> {
     const entry: StoredDestination = { id, kind, label: label.slice(0, 60), sealedTarget: await seal(target, this.env.TOKEN_KEY, 'destination'), createdAt: Date.now() }
     await this.ctx.storage.put('destinations', [...destinations, entry])
     return { id }
+  }
+
+  // Hides a finished handoff from the history. A waiting one is left alone: removing it would cancel a delivery.
+  async hideRelay(postId: string, destinationId: string): Promise<void> {
+    const relays = await this.list<Relay>('relays')
+    await this.ctx.storage.put('relays', relays.map((r) => (r.postId === postId && r.destinationId === destinationId && r.status !== 'waiting' ? { ...r, hidden: true } : r)))
   }
 
   async removeDestination(id: string): Promise<void> {

@@ -36,6 +36,8 @@ export interface Relay {
   externalLink: string | null
   deliveredAt: number | null
   preview: string
+  // Removed from the history by the user. Kept in storage so a later sync cannot hand it off again.
+  hidden?: boolean
 }
 
 // Buffer usually reports `sent` within a minute of dueAt; we look a little after.

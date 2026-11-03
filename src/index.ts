@@ -149,6 +149,12 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
     if (match.kind === 'tag' && !match.tagName.trim()) return json({ error: 'Tag name is required' }, 400)
     return json(await stub.addRule(b.destinationId, match))
   }
+  if (request.method === 'DELETE' && path.startsWith('/api/relays/')) {
+    const [postId, destinationId] = path.slice('/api/relays/'.length).split('/')
+    if (!postId || !destinationId) return json({ error: 'Use /api/relays/<postId>/<destinationId>' }, 400)
+    await stub.hideRelay(decodeURIComponent(postId), decodeURIComponent(destinationId))
+    return json({ ok: true })
+  }
   if (request.method === 'DELETE' && path.startsWith('/api/rules/')) {
     await stub.removeRule(path.split('/').pop()!)
     return json({ ok: true })
