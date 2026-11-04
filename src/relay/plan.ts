@@ -9,6 +9,8 @@ export interface Destination {
   id: string
   kind: DestinationKind
   label: string
+  // One of the public demo channels a judge can watch, added with one click.
+  demo?: boolean
 }
 
 export type RuleMatch = { kind: 'tag'; tagId: string; tagName: string } | { kind: 'channel'; channelId: string }
@@ -36,6 +38,8 @@ export interface Relay {
   externalLink: string | null
   deliveredAt: number | null
   preview: string
+  // The delivered message itself, when the destination returns a link (public Telegram channels, Discord).
+  messageLink?: string | null
   // Removed from the history by the user. Kept in storage so a later sync cannot hand it off again.
   hidden?: boolean
 }

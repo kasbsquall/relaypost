@@ -18,7 +18,11 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AccountDO", "RegistryDO"] }],
   "observability": { "enabled": true },
   "vars": {
-    "BUFFER_SCOPES": "account:read posts:read posts:write offline_access"
+    "BUFFER_SCOPES": "account:read posts:read posts:write offline_access",
+    // Judge mode: the public Telegram channel anyone can watch. Discord joins
+    // only when both DEMO_DISCORD_WEBHOOK (secret) and DEMO_DISCORD_INVITE are set.
+    "DEMO_TELEGRAM_CHAT": "@relaypost_demo",
+    "DEMO_TELEGRAM_URL": "https://t.me/relaypost_demo"
   }
   // Secrets (wrangler secret put, or .dev.vars locally):
   // BUFFER_CLIENT_ID, BUFFER_CLIENT_SECRET, REDIRECT_URI, SESSION_SECRET,

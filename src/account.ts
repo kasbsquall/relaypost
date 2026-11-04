@@ -8,6 +8,7 @@ import {
   CHANNELS_QUERY,
   CREATE_TAG_MUTATION,
   POSTS_QUERY,
+  POST_QUERY,
   SET_POST_TAGS_MUTATION,
   TAGS_QUERY,
   QUEUE_STATUSES,
@@ -22,7 +23,18 @@ import {
 } from './buffer/queries'
 import type { Env } from './env'
 import { randomToken, seal, unseal } from './lib/crypto'
-import { discordPayload, isDiscordWebhook, isSlackWebhook, sendDiscord, sendSlack, sendTelegram, slackPayload, type DeliveryResult } from './relay/deliver'
+import {
+  discordGuildId,
+  discordMessageLink,
+  discordPayload,
+  isDiscordWebhook,
+  isSlackWebhook,
+  sendDiscord,
+  sendSlack,
+  sendTelegram,
+  slackPayload,
+  type DeliveryResult,
+} from './relay/deliver'
 import {
   MAX_DELIVERY_ATTEMPTS,
   RETRY_DELAY_MS,
@@ -40,6 +52,8 @@ import {
 interface StoredDestination extends Destination {
   sealedTarget: string
   createdAt: number
+  // Discord server id, read once from the webhook so delivered messages can be linked.
+  guildId?: string | null
 }
 
 interface Profile {
@@ -71,6 +85,7 @@ const MAX_RULES = 30
 const RATE_RESERVE = 20
 const RELAY_TAG_COLOR = '#B14328'
 const TELEGRAM_CODE_TTL_MS = 30 * 60_000
+const DEMO_TAG = 'Relaypost demo'
 
 export class NotConnectedError extends Error {}
 
@@ -195,7 +210,7 @@ export class AccountDO extends DurableObject<Env> {
       account: { name: profile.account.name, avatar: profile.account.avatar },
       organizationId: profile.organizationId,
       connected: (await this.tokens()) !== null,
-      destinations: destinations.map(({ id, kind, label, createdAt }) => ({ id, kind, label, createdAt })),
+      destinations: destinations.map(({ id, kind, label, createdAt, demo }) => ({ id, kind, label, createdAt, demo: Boolean(demo) })),
       pendingTelegram: pending && pending.expiresAt > Date.now() ? pending : null,
       rules: await this.list<Rule>('rules'),
       relays: (await this.list<Relay>('relays')).filter((r) => !r.hidden).sort((a, b) => b.dueAt - a.dueAt).slice(0, 60),
@@ -298,12 +313,61 @@ export class AccountDO extends DurableObject<Env> {
     }
   }
 
-  private async storeDestination(kind: DestinationKind, label: string, target: string): Promise<{ id: string }> {
+  private async storeDestination(kind: DestinationKind, label: string, target: string, demo = false): Promise<{ id: string }> {
     const destinations = await this.list<StoredDestination>('destinations')
     const id = `d_${randomToken(6)}`
-    const entry: StoredDestination = { id, kind, label: label.slice(0, 60), sealedTarget: await seal(target, this.env.TOKEN_KEY, 'destination'), createdAt: Date.now() }
+    const entry: StoredDestination = {
+      id,
+      kind,
+      label: label.slice(0, 60),
+      sealedTarget: await seal(target, this.env.TOKEN_KEY, 'destination'),
+      createdAt: Date.now(),
+      ...(demo ? { demo: true } : {}),
+    }
     await this.ctx.storage.put('destinations', [...destinations, entry])
     return { id }
+  }
+
+  // Judge mode: the public demo channels become destinations, fed only by posts
+  // tagged "Relaypost demo" in Buffer, so nothing else from the account goes public.
+  async addDemo(): Promise<{ tagName: string; added: number }> {
+    const targets: { kind: DestinationKind; label: string; target: string }[] = []
+    if (this.env.DEMO_TELEGRAM_CHAT) targets.push({ kind: 'telegram', label: 'Relaypost public demo (Telegram)', target: this.env.DEMO_TELEGRAM_CHAT })
+    if (this.env.DEMO_DISCORD_WEBHOOK && this.env.DEMO_DISCORD_INVITE) {
+      targets.push({ kind: 'discord', label: 'Relaypost public demo (Discord)', target: this.env.DEMO_DISCORD_WEBHOOK })
+    }
+    if (!targets.length) throw new Error('The public demo channels are not set up on this server')
+    const existing = await this.list<StoredDestination>('destinations')
+    let added = 0
+    for (const t of targets) {
+      let dest = existing.find((d) => d.demo && d.kind === t.kind)
+      if (!dest) {
+        await this.assertRoomForDestination()
+        const { id } = await this.storeDestination(t.kind, t.label, t.target, true)
+        dest = (await this.list<StoredDestination>('destinations')).find((d) => d.id === id)!
+        added++
+      }
+      await this.addRule(dest.id, { kind: 'tag', tagName: DEMO_TAG })
+    }
+    return { tagName: DEMO_TAG, added }
+  }
+
+  // Sends a failed handoff again, right now. The post is read fresh from Buffer:
+  // it may be hours old and outside the sync window.
+  async retryRelay(postId: string, destinationId: string): Promise<Relay> {
+    const relays = await this.list<Relay>('relays')
+    const index = relays.findIndex((r) => r.postId === postId && r.destinationId === destinationId)
+    const relay = relays[index]
+    if (!relay || relay.status !== 'failed') throw new Error('Only a failed handoff can be sent again')
+    const { post } = await this.call<{ post: BufferPost }>(POST_QUERY, { id: postId }, 'interactive')
+    if (post.status !== 'sent') throw new Error('Buffer has not published this post, so there is nothing to hand off yet')
+    const destination = (await this.list<StoredDestination>('destinations')).find((d) => d.id === destinationId)
+    const next = await this.deliver({ ...relay, status: 'waiting' }, post, destination, Date.now())
+    // A retry that fails again stays failed: the alarm does not keep trying behind the user's back.
+    const settled: Relay = next.status === 'waiting' ? { ...next, status: 'failed' } : next
+    const fresh = await this.list<Relay>('relays')
+    await this.ctx.storage.put('relays', fresh.map((r) => (r.postId === postId && r.destinationId === destinationId ? settled : r)))
+    return settled
   }
 
   // Hides a finished handoff from the history. A waiting one is left alone: removing it would cancel a delivery.
@@ -430,9 +494,21 @@ export class AccountDO extends DurableObject<Env> {
           ? await sendSlack(target, slackPayload(post))
           : await sendTelegram(this.env.TELEGRAM_BOT_TOKEN, target, post)
     const attempts = relay.attempts + 1
-    if (result.ok) return { ...relay, status: 'delivered', attempts, detail: result.detail, externalLink: post.externalLink, deliveredAt: now }
+    if (result.ok) {
+      const messageLink = result.link ?? (result.discordMessage ? discordMessageLink(await this.guildOf(destination, target), result.discordMessage) : null)
+      return { ...relay, status: 'delivered', attempts, detail: result.detail, externalLink: post.externalLink, deliveredAt: Date.now(), messageLink }
+    }
     if (result.retryable && attempts < MAX_DELIVERY_ATTEMPTS) return { ...relay, attempts, detail: result.detail, checkAt: now + RETRY_DELAY_MS }
     return { ...relay, status: 'failed', attempts, detail: result.detail }
+  }
+
+  // The Discord server id never changes for a webhook: read it once and keep it.
+  private async guildOf(destination: StoredDestination, webhookUrl: string): Promise<string | null> {
+    if (destination.guildId !== undefined) return destination.guildId
+    const guildId = await discordGuildId(webhookUrl)
+    const all = await this.list<StoredDestination>('destinations')
+    await this.ctx.storage.put('destinations', all.map((d) => (d.id === destination.id ? { ...d, guildId } : d)))
+    return guildId
   }
 
   private async schedule(): Promise<void> {

@@ -9,6 +9,7 @@ import { handoff, renderTrack } from './track.js'
 const STATE_POLL_MS = 20_000
 const QUEUE_REFRESH_MS = 5 * 60_000
 const HISTORY_ROWS = 12
+const DEMO_TAG = 'Relaypost demo'
 const $ = (sel) => document.querySelector(sel)
 
 // ------------------------------------------------------------------ sound
@@ -232,7 +233,12 @@ export function drawTrack(settled = false) {
 
 function friendly(r) {
   const d = r.detail ?? ''
-  if (r.status === 'delivered') return { cls: 'ok', ic: 'check-circle', head: 'Delivered', sub: /text only/.test(d) ? 'Text only: the image could not be fetched.' : '' }
+  if (r.status === 'delivered') {
+    const notes = []
+    if (r.attempts > 1) notes.push(`Got through on try ${r.attempts}.`)
+    if (/text only/.test(d)) notes.push('Text only: the image could not be fetched.')
+    return { cls: 'ok', ic: 'check-circle', head: 'Delivered', sub: notes.join(' ') }
+  }
   if (r.status === 'waiting') {
     const at = new Date(r.checkAt)
     return { cls: 'wait', ic: 'hourglass-medium', head: r.attempts ? 'Trying again' : 'Waiting for Buffer', sub: r.attempts ? `${d}. Next try at ${hm(at)}.` : `Hands off after Buffer publishes it, about ${hm(at)}.` }
@@ -245,6 +251,16 @@ function friendly(r) {
   else if (/chat not found|bot was kicked|not a member/i.test(d)) sub = 'The Relaypost bot is no longer in this channel.'
   const fix = /Discord answered HTTP (401|403|404)/.test(d) ? 'discord' : /Slack answered HTTP (403|404|410)/.test(d) ? 'slack' : ''
   return { cls: 'fail', ic: 'warning-circle', head: 'Failed', sub, fix }
+}
+
+const isHttps = (u) => /^https:\/\//.test(u ?? '')
+
+// The delivered message in its destination first, the original post second.
+function rowLinks(r, dest) {
+  const out = []
+  if (isHttps(r.messageLink)) out.push(`<a class="link" href="${esc(r.messageLink)}" target="_blank" rel="noopener">In ${destKindName(dest?.kind)}${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>`)
+  if (isHttps(r.externalLink)) out.push(`<a class="link" href="${esc(r.externalLink)}" target="_blank" rel="noopener">Original${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>`)
+  return out.length ? `<div class="links">${out.join('')}</div>` : ''
 }
 
 function renderHistory(freshKeys = new Set()) {
@@ -262,7 +278,9 @@ function renderHistory(freshKeys = new Set()) {
       : r.status === 'waiting' ? `<span class="dash num">${hm(new Date(r.dueAt))}</span>` : '<span class="dash">No time</span>'
     const act = f.fix
       ? `<button class="btn dark" type="button" data-act="add-dest" data-kind="${f.fix}">${icon('link')}Paste a new webhook</button>`
-      : /^https:\/\//.test(r.externalLink ?? '') ? `<a class="link" href="${esc(r.externalLink)}" target="_blank" rel="noopener">Original${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>` : ''
+      : r.status === 'failed'
+        ? `<button class="btn" type="button" data-act="retry-relay" data-post="${esc(r.postId)}" data-dest="${esc(r.destinationId)}">${icon('arrows-clockwise')}Send again</button>`
+        : rowLinks(r, dest)
     const key = `${r.postId}:${r.destinationId}`
     return `<tr style="--i:${Math.min(i, 7)}"${freshKeys.has(key) ? ' data-fresh' : ''}>
       <td class="post-cell"><div class="when num">${esc(dateShort(new Date(r.dueAt)))}, ${hm(new Date(r.dueAt))}</div><div class="ptext">${icon(serviceIcon(ch?.service))}<span class="sr">${esc(channelLabel(ch))}: </span><span>${esc(r.preview || '(media only)')}</span></div></td>
@@ -303,6 +321,23 @@ function renderDestinations() {
   $('#dest-list').hidden = list.length === 0
 }
 
+// Judge mode: anyone can watch a handoff land without making a channel of their own.
+function renderDemo() {
+  const box = $('#demo')
+  const demo = app.state.demo
+  if (!demo) { box.hidden = true; return }
+  box.hidden = false
+  const added = app.state.destinations.some((d) => d.demo)
+  const watch = [
+    isHttps(demo.telegramUrl) ? `<a class="link" href="${esc(demo.telegramUrl)}" target="_blank" rel="noopener">${icon('telegram-logo')}Watch the Telegram channel<span class="sr"> (opens in a new tab)</span></a>` : '',
+    isHttps(demo.discordInvite) ? `<a class="link" href="${esc(demo.discordInvite)}" target="_blank" rel="noopener">${icon('discord-logo')}Join the Discord server<span class="sr"> (opens in a new tab)</span></a>` : '',
+  ].join('')
+  $('#demo-body').textContent = added
+    ? `Connected. Open a queued post on the track and switch on the public channel, or tag a post "${DEMO_TAG}" in Buffer. Within a minute of Buffer publishing it, it shows up in the public channel below. Posts without the tag never go there.`
+    : `Relaypost keeps a public channel anyone can watch. Adding it connects that channel and one rule: only posts you tag "${DEMO_TAG}" in Buffer go there. Everything you post there is public.`
+  $('#demo-act').innerHTML = (added ? '' : `<button class="btn dark" type="button" data-act="add-demo">${icon('plus')}Add the public channel</button>`) + watch
+}
+
 export function renderAll(opts = {}) {
   renderTop()
   renderHead()
@@ -310,6 +345,7 @@ export function renderAll(opts = {}) {
   renderHistory(opts.fresh)
   renderRules()
   renderDestinations()
+  renderDemo()
 }
 
 // ---------------------------------------------------------------- loading
@@ -376,6 +412,24 @@ async function onAction(e) {
       el.disabled = true
       await loadQueue()
       el.disabled = false
+      return renderAll({ settled: true })
+    }
+    if (act === 'retry-relay') {
+      el.disabled = true
+      el.setAttribute('aria-busy', 'true')
+      const relay = await api('/api/relays/retry', 'POST', { postId: el.dataset.post, destinationId: el.dataset.dest })
+      await loadState()
+      renderAll({ settled: true })
+      if (relay.status === 'delivered') { play('handoff'); toast('Sent again. It landed.') }
+      else toast(`Still not through: ${relay.detail || 'the destination refused it'}.`, true)
+      return
+    }
+    if (act === 'add-demo') {
+      el.disabled = true
+      const res = await api('/api/demo', 'POST')
+      await Promise.all([loadState(), loadQueue()])
+      play('added')
+      toast(`Public channel added. Tag a post "${res.tagName}" in Buffer to send it there.`)
       return renderAll({ settled: true })
     }
     if (act === 'new-rule') return app.state.destinations.length ? newRuleDialog() : addDestinationDialog()

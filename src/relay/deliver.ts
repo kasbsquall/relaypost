@@ -37,6 +37,10 @@ export interface DeliveryResult {
   detail: string
   // Retrying makes sense for network trouble and 5xx/429, never for 4xx.
   retryable: boolean
+  // Where the delivered message can be opened, when the destination tells us.
+  link?: string | null
+  // Discord answers with the message and channel ids; the server id comes from the webhook itself.
+  discordMessage?: { id: string; channelId: string }
 }
 
 // --- Discord: incoming webhooks (https://discord.com/developers/docs/resources/webhook#execute-webhook)
@@ -70,11 +74,31 @@ export async function sendDiscord(webhookUrl: string, payload: Record<string, un
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     })
-    if (res.ok) return { ok: true, detail: 'Posted to Discord', retryable: false }
+    if (res.ok) {
+      const message = (await res.json().catch(() => ({}))) as { id?: string; channel_id?: string }
+      const discordMessage = message.id && message.channel_id ? { id: message.id, channelId: message.channel_id } : undefined
+      return { ok: true, detail: 'Posted to Discord', retryable: false, discordMessage }
+    }
     return { ok: false, detail: `Discord answered HTTP ${res.status}`, retryable: res.status === 429 || res.status >= 500 }
   } catch {
     return { ok: false, detail: 'Could not reach Discord', retryable: true }
   }
+}
+
+// GET on a webhook URL returns the webhook object, which carries the server id.
+export async function discordGuildId(webhookUrl: string, fetcher: typeof fetch = fetch): Promise<string | null> {
+  try {
+    const res = await fetcher(webhookUrl)
+    if (!res.ok) return null
+    const hook = (await res.json()) as { guild_id?: string }
+    return hook.guild_id ?? null
+  } catch {
+    return null
+  }
+}
+
+export function discordMessageLink(guildId: string | null | undefined, message: { id: string; channelId: string } | undefined): string | null {
+  return guildId && message ? `https://discord.com/channels/${guildId}/${message.channelId}/${message.id}` : null
 }
 
 // --- Telegram: Bot API (https://core.telegram.org/bots/api)
@@ -106,6 +130,12 @@ export async function telegramCall(
   return { ok: Boolean(json.ok), status: res.status, result: json.result, description: json.description }
 }
 
+// Only public channels have a username, and only those have a link anyone can open.
+export function telegramLink(result: unknown): string | null {
+  const m = result as { message_id?: number; chat?: { username?: string } } | undefined
+  return m?.message_id && m.chat?.username ? `https://t.me/${m.chat.username}/${m.message_id}` : null
+}
+
 export async function sendTelegram(
   botToken: string,
   chatId: string,
@@ -115,12 +145,12 @@ export async function sendTelegram(
   const message = telegramMessage(post)
   try {
     const first = await telegramCall(botToken, message.method, { chat_id: chatId, ...message.body }, fetcher)
-    if (first.ok) return { ok: true, detail: 'Posted to Telegram', retryable: false }
+    if (first.ok) return { ok: true, detail: 'Posted to Telegram', retryable: false, link: telegramLink(first.result) }
     // Telegram fetches the photo itself; if the host refuses it, fall back to text with the link.
     if (message.method === 'sendPhoto') {
       const text = telegramMessage({ ...post, assets: [] })
       const second = await telegramCall(botToken, text.method, { chat_id: chatId, ...text.body }, fetcher)
-      if (second.ok) return { ok: true, detail: 'Posted to Telegram (text only, the image could not be fetched)', retryable: false }
+      if (second.ok) return { ok: true, detail: 'Posted to Telegram (text only, the image could not be fetched)', retryable: false, link: telegramLink(second.result) }
     }
     return {
       ok: false,

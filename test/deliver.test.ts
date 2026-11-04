@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { BufferPost } from '../src/buffer/queries'
-import { discordPayload, isDiscordWebhook, isSlackWebhook, sendDiscord, sendSlack, sendTelegram, slackPayload, telegramMessage } from '../src/relay/deliver'
+import { discordGuildId, discordMessageLink, discordPayload, isDiscordWebhook, telegramLink, isSlackWebhook, sendDiscord, sendSlack, sendTelegram, slackPayload, telegramMessage } from '../src/relay/deliver'
 
 function post(overrides: Partial<BufferPost> = {}): BufferPost {
   return {
@@ -106,5 +106,34 @@ describe('Slack', () => {
     const gone = await sendSlack('https://hooks.slack.com/services/T1/B1/a', {}, f404)
     expect(gone.retryable).toBe(false)
     expect(gone.detail).toBe('Slack answered HTTP 404 (channel_not_found)')
+  })
+})
+
+describe('Links to the delivered message', () => {
+  it('reads the message and channel ids from a Discord webhook answer', async () => {
+    const f = vi.fn(async () => jsonResponse({ id: '111', channel_id: '222' })) as unknown as typeof fetch
+    const r = await sendDiscord('https://discord.com/api/webhooks/1/a', {}, f)
+    expect(r.discordMessage).toEqual({ id: '111', channelId: '222' })
+    expect(discordMessageLink('333', r.discordMessage)).toBe('https://discord.com/channels/333/222/111')
+  })
+
+  it('gives no Discord link without the server id', () => {
+    expect(discordMessageLink(null, { id: '1', channelId: '2' })).toBeNull()
+  })
+
+  it('reads the server id from the webhook object', async () => {
+    const f = vi.fn(async () => jsonResponse({ guild_id: '999', channel_id: '222' })) as unknown as typeof fetch
+    expect(await discordGuildId('https://discord.com/api/webhooks/1/a', f)).toBe('999')
+  })
+
+  it('links only to public Telegram channels', () => {
+    expect(telegramLink({ message_id: 42, chat: { username: 'relaypost_demo' } })).toBe('https://t.me/relaypost_demo/42')
+    expect(telegramLink({ message_id: 42, chat: { id: -100 } })).toBeNull()
+  })
+
+  it('returns the Telegram link after a successful send', async () => {
+    const f = vi.fn(async () => jsonResponse({ ok: true, result: { message_id: 7, chat: { username: 'relaypost_demo' } } })) as unknown as typeof fetch
+    const r = await sendTelegram('token', '@relaypost_demo', post(), f)
+    expect(r.link).toBe('https://t.me/relaypost_demo/7')
   })
 })

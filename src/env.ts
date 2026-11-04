@@ -14,6 +14,11 @@ export interface Env {
   TELEGRAM_BOT_TOKEN: string
   TELEGRAM_BOT_USERNAME: string
   TELEGRAM_WEBHOOK_SECRET: string
+  // Judge mode, all optional: the public demo channels anyone can watch.
+  DEMO_TELEGRAM_CHAT?: string
+  DEMO_TELEGRAM_URL?: string
+  DEMO_DISCORD_WEBHOOK?: string
+  DEMO_DISCORD_INVITE?: string
 }
 
 const REQUIRED: (keyof Env)[] = [

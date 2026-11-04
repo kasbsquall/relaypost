@@ -352,3 +352,35 @@ footer.foot{max-width:1440px;margin:0 auto;padding:28px 32px 40px;font-size:13px
   .toast{bottom:84px}
 }
 @media (min-width: 761px){ .mobile-only{display:none !important} }
+
+/* history: links to the delivered message */
+.links{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.btn[aria-busy="true"] .ic{animation:spin 1s linear infinite}
+
+/* judge mode: the public demo channel */
+.demo{margin:0 20px 18px;padding:16px;border-radius:12px;background:var(--bg);border:1px dashed var(--line-2)}
+.demo-h{margin:0 0 6px;font-weight:600;font-size:14px;display:flex;gap:8px;align-items:center}
+.demo-b{margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--ink-2)}
+.demo-act{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center}
+
+/* sheet: how it lands */
+.seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;background:var(--bg);border:1px solid var(--line-2);margin:4px 0 12px}
+.seg button{display:inline-flex;gap:6px;align-items:center;border:0;background:none;font:500 13px/1 var(--text);color:var(--ink-2);padding:7px 11px;border-radius:7px;cursor:pointer;transition:background .15s var(--ease-out),color .15s var(--ease-out)}
+.seg button:hover{color:var(--ink)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px oklch(35% .06 40 / .12)}
+.seg button:active{transform:scale(.97)}
+.mock{border-radius:10px;padding:12px 14px;font-size:13.5px;line-height:1.45;overflow-wrap:anywhere}
+.mock p{margin:0}
+.mock img{display:block;max-width:100%;max-height:180px;border-radius:6px;margin:8px 0 0;object-fit:cover}
+.mock .m-text{white-space:pre-line;display:-webkit-box;-webkit-line-clamp:7;-webkit-box-orient:vertical;overflow:hidden}
+.mock .m-foot{margin-top:8px;font-size:11.5px;opacity:.7}
+.mock .m-link{margin-top:10px}
+.mock.discord{display:grid;grid-template-columns:4px 1fr;gap:12px;background:oklch(30% .015 270);color:oklch(93% .005 270)}
+.mock.discord .stripe{background:#b14328;border-radius:3px}
+.mock.discord .m-title{font-weight:600;color:oklch(78% .1 240);margin-bottom:4px}
+.mock.slack{background:var(--surface);border:1px solid var(--line-2);color:var(--ink)}
+.mock.telegram{background:oklch(95% .03 150);color:var(--ink);border-radius:12px 12px 12px 4px;max-width:92%}
+.mock.telegram img{margin:0 0 8px}
+.land-note{margin:8px 0 0;font-size:12.5px;color:var(--ink-3);display:flex;gap:6px;align-items:flex-start}
+.land-note .ic{width:14px;height:14px;margin-top:1px;flex:none}
+@media (prefers-reduced-motion: reduce){.btn[aria-busy="true"] .ic{animation:none}.seg button:active{transform:none}}

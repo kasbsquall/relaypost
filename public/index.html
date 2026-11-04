@@ -146,6 +146,11 @@
         </div>
         <p class="panel-empty" id="dest-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>No destinations yet. Add a Discord, Telegram or Slack channel.</span></p>
         <ul class="list" id="dest-list"></ul>
+        <div class="demo" id="demo" hidden>
+          <p class="demo-h"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-broadcast"></use></svg>No channel of your own? Use the public one.</p>
+          <p class="demo-b" id="demo-body"></p>
+          <div class="demo-act" id="demo-act"></div>
+        </div>
       </section>
     </div>
   </div>
@@ -175,6 +180,11 @@
       <div class="meta" id="sheet-meta"></div>
       <h3>Hands off to</h3>
       <div id="sheet-dests"></div>
+      <div id="sheet-lands" hidden>
+        <h3>How it lands</h3>
+        <div class="seg" id="lands-seg" role="group" aria-label="Preview for"></div>
+        <div class="land" id="lands-view" aria-live="polite"></div>
+      </div>
     </div>
     <div class="sheet-f">
       <a class="btn" href="https://publish.buffer.com/" target="_blank" rel="noopener"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-arrow-square-out"></use></svg>Edit the post in Buffer<span class="sr"> (opens in a new tab)</span></a>

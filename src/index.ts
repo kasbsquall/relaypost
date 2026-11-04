@@ -121,7 +121,16 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
   const stub = accountStub(env, accountId)
   const m = `${request.method} ${path}`
 
-  if (m === 'GET /api/state') return json({ ...(await stub.state()), telegramBot: env.TELEGRAM_BOT_USERNAME })
+  if (m === 'GET /api/state') {
+    const demo = env.DEMO_TELEGRAM_CHAT ? { telegramUrl: env.DEMO_TELEGRAM_URL ?? null, discordInvite: env.DEMO_DISCORD_WEBHOOK ? (env.DEMO_DISCORD_INVITE ?? null) : null } : null
+    return json({ ...(await stub.state()), telegramBot: env.TELEGRAM_BOT_USERNAME, demo })
+  }
+  if (m === 'POST /api/demo') return json(await stub.addDemo())
+  if (m === 'POST /api/relays/retry') {
+    const b = await body<{ postId?: string; destinationId?: string }>(request)
+    if (!b.postId || !b.destinationId) return json({ error: 'postId and destinationId are required' }, 400)
+    return json(await stub.retryRelay(b.postId, b.destinationId))
+  }
   if (m === 'GET /api/channels') return json(await stub.channels())
   if (m === 'GET /api/queue') return json(await stub.queue())
   if (m === 'POST /api/sync') return json(await stub.manualSync())

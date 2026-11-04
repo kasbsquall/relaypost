@@ -69,6 +69,14 @@ export const POSTS_QUERY = /* GraphQL */ `
   ${POST_FIELDS}
 `
 
+// One post by id: used when a failed handoff is retried by hand, possibly hours later.
+export const POST_QUERY = /* GraphQL */ `
+  query Post($id: PostId!) {
+    post(input: { id: $id }) { ...RelayPost }
+  }
+  ${POST_FIELDS}
+`
+
 export const CREATE_TAG_MUTATION = /* GraphQL */ `
   mutation CreateTag($organizationId: OrganizationId!, $name: String!, $color: String!) {
     createTag(input: { organizationId: $organizationId, tag: { name: $name, color: $color } }) {

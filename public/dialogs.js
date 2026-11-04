@@ -53,6 +53,59 @@ function renderSheet() {
     (images ? `<span>${icon('image')}${images} ${images === 1 ? 'image' : 'images'}, sent along</span>` : `<span>${icon('text-aa')}Text only</span>`) +
     (p.tags.length ? p.tags.map((t) => `<span>${icon('tag-simple')}${esc(t.name)}</span>`).join('') : `<span>${icon('tag-simple')}No tags</span>`)
   renderSheetDests(p, ch, due)
+  renderLands(p, ch)
+}
+
+// ------------------------------------------------------------ how it lands
+// Mirrors the server's payloads in src/relay/deliver.ts: same limits, same footer.
+
+const LIMITS = { discord: 4000, slack: 3000, telegramText: 4096, telegramCaption: 1024 }
+let landsKind = null
+
+function clipped(text, max) {
+  return text.length <= max ? { text, cut: false } : { text: `${text.slice(0, max - 1)}…`, cut: true }
+}
+
+function landsPreview(kind, p, ch) {
+  const service = serviceName(ch?.service)
+  const image = p.assets.find((a) => a.type === 'image')?.source
+  const img = /^https:\/\//.test(image ?? '') ? `<img src="${esc(image)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''
+  const text = p.text || ''
+  if (kind === 'discord') {
+    const c = clipped(text, LIMITS.discord)
+    return { note: c.cut ? `Discord embeds hold ${LIMITS.discord.toLocaleString('en-US')} characters, so the end is cut.` : 'Sent as an embed: the link to the original appears once Buffer publishes.',
+      html: `<div class="mock discord"><span class="stripe" aria-hidden="true"></span><div>
+        <p class="m-title">Open on ${esc(service)}</p><p class="m-text">${esc(c.text)}</p>${img}
+        <p class="m-foot">Also on ${esc(service)} · relayed by Relaypost</p></div></div>` }
+  }
+  if (kind === 'slack') {
+    const c = clipped(text, LIMITS.slack)
+    return { note: c.cut ? `Slack sections hold ${LIMITS.slack.toLocaleString('en-US')} characters, so the end is cut.` : 'Plain text, so a stray @channel or link markup stays harmless.',
+      html: `<div class="mock slack"><p class="m-text">${esc(c.text)}</p>${img}<p class="m-foot">Also on <u>${esc(service)}</u> · relayed by Relaypost</p></div>` }
+  }
+  const max = image ? LIMITS.telegramCaption : LIMITS.telegramText
+  const link = `
+
+Also on ${service}: (link once published)`
+  const c = clipped(text, max - link.length)
+  return { note: image ? `Sent as a photo. Telegram captions hold ${LIMITS.telegramCaption.toLocaleString('en-US')} characters${c.cut ? ', so the end is cut' : ''}.` : c.cut ? 'Telegram messages hold 4,096 characters, so the end is cut.' : 'Sent as a message, with the link to the original at the end.',
+    html: `<div class="mock telegram">${img}<p class="m-text">${esc(c.text)}</p><p class="m-link">Also on ${esc(service)}: <u>link once published</u></p></div>` }
+}
+
+function renderLands(p, ch) {
+  const kinds = [...new Set(app.state.destinations.map((d) => d.kind))]
+  const box = $('#sheet-lands')
+  box.hidden = kinds.length === 0
+  if (!kinds.length) return
+  if (!kinds.includes(landsKind)) landsKind = kinds[0]
+  $('#lands-seg').innerHTML = kinds.map((k) => `<button type="button" data-kind="${k}" aria-pressed="${k === landsKind}">${icon(destIcon(k))}${destKindName(k)}</button>`).join('')
+  const view = landsPreview(landsKind, p, ch)
+  $('#lands-view').innerHTML = `${view.html}<p class="land-note">${icon('info')}<span>${esc(view.note)}</span></p>`
+  $('#lands-seg').querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
+    landsKind = b.dataset.kind
+    renderLands(p, ch)
+    $(`#lands-seg [data-kind="${landsKind}"]`)?.focus()
+  }))
 }
 
 function renderSheetDests(p, ch, due) {
