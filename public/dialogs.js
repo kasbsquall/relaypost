@@ -27,7 +27,7 @@ sheet.addEventListener('close', () => {
   again?.focus()
 })
 
-const defaultTag = (dest) => `Relaypost ${dest.label}`.replace(/\s+/g, ' ').slice(0, 40)
+const defaultTag = (dest) => (/^relaypost\b/i.test(dest.label) ? dest.label : `Relaypost ${dest.label}`).replace(/\s+/g, ' ').slice(0, 40)
 
 export function openPostSheet(id, btn) {
   const p = app.queue?.find((q) => q.id === id)
