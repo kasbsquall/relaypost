@@ -79,14 +79,16 @@ function landsPreview(kind, p, ch) {
         <p class="m-foot">Also on ${esc(service)} · relayed by Relaypost</p></div></div>` }
   }
   if (kind === 'slack') {
-    const c = clipped(text, LIMITS.slack)
+    const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const c = escaped.length <= LIMITS.slack ? clipped(text, LIMITS.slack) : { text: `${escaped.slice(0, LIMITS.slack - 1)}…`.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), cut: true }
     return { note: c.cut ? `Slack sections hold ${LIMITS.slack.toLocaleString('en-US')} characters, so the end is cut.` : 'Plain text, so a stray @channel or link markup stays harmless.',
       html: `<div class="mock slack"><p class="m-text">${esc(c.text)}</p>${img}<p class="m-foot">Also on <u>${esc(service)}</u> · relayed by Relaypost</p></div>` }
   }
   const max = image ? LIMITS.telegramCaption : LIMITS.telegramText
+  // The real link is unknown until Buffer publishes; a typical post URL is about 70 characters.
   const link = `
 
-Also on ${service}: (link once published)`
+Also on ${service}: ${'x'.repeat(70)}`
   const c = clipped(text, max - link.length)
   return { note: image ? `Sent as a photo. Telegram captions hold ${LIMITS.telegramCaption.toLocaleString('en-US')} characters${c.cut ? ', so the end is cut' : ''}.` : c.cut ? 'Telegram messages hold 4,096 characters, so the end is cut.' : 'Sent as a message, with the link to the original at the end.',
     html: `<div class="mock telegram">${img}<p class="m-text">${esc(c.text)}</p><p class="m-link">Also on ${esc(service)}: <u>link once published</u></p></div>` }

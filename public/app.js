@@ -333,8 +333,8 @@ function renderDemo() {
     isHttps(demo.discordInvite) ? `<a class="link" href="${esc(demo.discordInvite)}" target="_blank" rel="noopener">${icon('discord-logo')}Join the Discord server<span class="sr"> (opens in a new tab)</span></a>` : '',
   ].join('')
   $('#demo-body').textContent = added
-    ? `Connected. Open a queued post on the track and switch on the public channel, or tag a post "${DEMO_TAG}" in Buffer. Within a minute of Buffer publishing it, it shows up in the public channel below. Posts without the tag never go there.`
-    : `Relaypost keeps a public channel anyone can watch. Adding it connects that channel and one rule: only posts you tag "${DEMO_TAG}" in Buffer go there. Everything you post there is public.`
+    ? `Connected. Open a queued post on the track and switch on the public channel, or tag a post "${DEMO_TAG}" in Buffer. Within a minute of Buffer publishing it, it shows up in the public channel below. Posts without the tag never go there. Up to 3 a day.`
+    : `Relaypost keeps a public channel anyone can watch. Adding it connects that channel and one rule: only posts you tag "${DEMO_TAG}" in Buffer go there. Up to 3 posts a day per account, and everything there is public.`
   $('#demo-act').innerHTML = (added ? '' : `<button class="btn dark" type="button" data-act="add-demo">${icon('plus')}Add the public channel</button>`) + watch
 }
 

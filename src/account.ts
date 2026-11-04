@@ -86,6 +86,9 @@ const RATE_RESERVE = 20
 const RELAY_TAG_COLOR = '#B14328'
 const TELEGRAM_CODE_TTL_MS = 30 * 60_000
 const DEMO_TAG = 'Relaypost demo'
+// The public demo channel is open to any Buffer account; this keeps one account from flooding it.
+const DEMO_DAILY_LIMIT = 3
+const DAY_MS = 86_400_000
 
 export class NotConnectedError extends Error {}
 
@@ -355,19 +358,26 @@ export class AccountDO extends DurableObject<Env> {
   // Sends a failed handoff again, right now. The post is read fresh from Buffer:
   // it may be hours old and outside the sync window.
   async retryRelay(postId: string, destinationId: string): Promise<Relay> {
-    const relays = await this.list<Relay>('relays')
-    const index = relays.findIndex((r) => r.postId === postId && r.destinationId === destinationId)
-    const relay = relays[index]
-    if (!relay || relay.status !== 'failed') throw new Error('Only a failed handoff can be sent again')
-    const { post } = await this.call<{ post: BufferPost }>(POST_QUERY, { id: postId }, 'interactive')
-    if (post.status !== 'sent') throw new Error('Buffer has not published this post, so there is nothing to hand off yet')
-    const destination = (await this.list<StoredDestination>('destinations')).find((d) => d.id === destinationId)
-    const next = await this.deliver({ ...relay, status: 'waiting' }, post, destination, Date.now())
-    // A retry that fails again stays failed: the alarm does not keep trying behind the user's back.
-    const settled: Relay = next.status === 'waiting' ? { ...next, status: 'failed' } : next
-    const fresh = await this.list<Relay>('relays')
-    await this.ctx.storage.put('relays', fresh.map((r) => (r.postId === postId && r.destinationId === destinationId ? settled : r)))
-    return settled
+    // Same chain as sync: a retry and the alarm never deliver the same handoff
+    // at once, and two clicks cannot both pass the "failed" check.
+    return this.serialize('syncChain', async () => {
+      const relay = (await this.list<Relay>('relays')).find((r) => r.postId === postId && r.destinationId === destinationId)
+      if (!relay || relay.status !== 'failed') throw new Error('Only a failed handoff can be sent again')
+      const { post } = await this.call<{ post: BufferPost }>(POST_QUERY, { id: postId }, 'interactive')
+      if (post.status !== 'sent') throw new Error('Buffer has not published this post, so there is nothing to hand off yet')
+      const destination = (await this.list<StoredDestination>('destinations')).find((d) => d.id === destinationId)
+      let next: Relay
+      try {
+        next = await this.deliver({ ...relay, status: 'waiting' }, post, destination, Date.now())
+      } catch {
+        next = { ...relay, detail: 'Relaypost could not read this destination; connect it again' }
+      }
+      // A retry that fails again stays failed: the alarm does not keep trying behind the user's back.
+      const settled: Relay = next.status === 'waiting' ? { ...next, status: 'failed' } : next
+      const fresh = await this.list<Relay>('relays')
+      await this.ctx.storage.put('relays', fresh.map((r) => (r.postId === postId && r.destinationId === destinationId ? settled : r)))
+      return settled
+    })
   }
 
   // Hides a finished handoff from the history. A waiting one is left alone: removing it would cancel a delivery.
@@ -486,6 +496,9 @@ export class AccountDO extends DurableObject<Env> {
 
   private async deliver(relay: Relay, post: BufferPost, destination: StoredDestination | undefined, now: number): Promise<Relay> {
     if (!destination) return { ...relay, status: 'skipped', detail: 'The destination was removed' }
+    if (destination.demo && (await this.demoSentToday(destination.id, now)) >= DEMO_DAILY_LIMIT) {
+      return { ...relay, status: 'skipped', detail: `The public channel takes ${DEMO_DAILY_LIMIT} posts a day per account` }
+    }
     const target = await unseal(destination.sealedTarget, this.env.TOKEN_KEY, 'destination')
     const result: DeliveryResult =
       destination.kind === 'discord'
@@ -502,10 +515,17 @@ export class AccountDO extends DurableObject<Env> {
     return { ...relay, status: 'failed', attempts, detail: result.detail }
   }
 
+  private async demoSentToday(destinationId: string, now: number): Promise<number> {
+    return (await this.list<Relay>('relays')).filter((r) => r.destinationId === destinationId && r.status === 'delivered' && (r.deliveredAt ?? 0) > now - DAY_MS).length
+  }
+
   // The Discord server id never changes for a webhook: read it once and keep it.
+  // A failed read is not stored, so the next delivery asks again.
   private async guildOf(destination: StoredDestination, webhookUrl: string): Promise<string | null> {
-    if (destination.guildId !== undefined) return destination.guildId
+    const stored = (await this.list<StoredDestination>('destinations')).find((d) => d.id === destination.id)?.guildId
+    if (stored) return stored
     const guildId = await discordGuildId(webhookUrl)
+    if (!guildId) return null
     const all = await this.list<StoredDestination>('destinations')
     await this.ctx.storage.put('destinations', all.map((d) => (d.id === destination.id ? { ...d, guildId } : d)))
     return guildId
