@@ -42,7 +42,7 @@ They can forward a post, but they fire on their own trigger. Relaypost is built 
 
 ### Why `posts:write`
 
-Only to add or remove a routing tag on a post and to create that tag. The `editPost` call sends the post's text back exactly as Buffer last returned it, read on the server, so the browser never decides the text or the tag list. Relaypost never creates, rewrites or deletes a post.
+Only to add or remove a routing tag on a post and to create that tag. Buffer's `editPost` needs the text sent back with the tags, so Relaypost reads the post fresh from Buffer right before the write and sends that text unchanged. The browser never decides the text or the tag list, and an edit you made in Buffer a minute earlier is kept. Relaypost never creates or deletes a post, and never changes its text, media or schedule.
 
 ## Run it locally
 

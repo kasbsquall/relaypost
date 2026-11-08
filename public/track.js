@@ -100,7 +100,7 @@ function renderHorizontal(W, ctx) {
     const xl = ticks[i + 2]
     if (i % 2 === 0) s += `<rect x="${xl}" y="${AX}" width="${xr - xl}" height="${TH - AX}" fill="oklch(97% .005 70)" fill-opacity=".045"/>`
     s += `<line x1="${xr}" x2="${xr}" y1="${AX - 10}" y2="${TH}" stroke="var(--lane)" stroke-opacity=".22"/>`
-    // Skip a day label that would run into the "Later" marker at the far left.
+    // Skip a day label that would run into the "Toward now" marker at the far left.
     if (xr - xl > 46 && xr - labelW > 130) dayLabels += `<span class="axis-label num" style="left:${xr - 8}px;top:${AX / 2 - 9}px;transform:translateX(-100%)">${dayShort(m)} ${m.getDate()}</span>`
   })
   s += `<line x1="0" x2="${W}" y1="${AX}" y2="${AX}" stroke="var(--lane)" stroke-opacity=".28"/>`
@@ -139,7 +139,7 @@ function renderHorizontal(W, ctx) {
   s += '</g>'
 
   let o = `<span class="axis-label" style="left:18px;top:${AX / 2 - 9}px">Buffer channels</span>`
-  o += `<span class="axis-label later" style="left:${labelW + 14}px;top:${AX / 2 - 9}px">Later ${icon('arrow-right')}</span>`
+  o += `<span class="axis-label later" style="left:${labelW + 14}px;top:${AX / 2 - 9}px">Toward now ${icon('arrow-right')}</span>`
   o += dayLabels
   o += `<span class="now-pill num" style="left:${nowX}px;top:${AX / 2}px">Now · ${dayShort(now)} ${hm(now)}</span>`
   o += `<span class="axis-label" style="left:${nowX + 66}px;top:${AX / 2 - 9}px">Destinations</span>`

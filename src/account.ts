@@ -493,8 +493,11 @@ export class AccountDO extends DurableObject<Env> {
 
   // Toggle a tag on one post from the queue view: adds or removes the tag in Buffer.
   async setPostTag(postId: string, tagId: string, on: boolean): Promise<BufferPost> {
-    const post = (await this.queue()).find((p) => p.id === postId)
-    if (!post) throw new Error('That post is no longer in your Buffer queue')
+    if (!(await this.queue()).some((p) => p.id === postId)) throw new Error('That post is no longer in your Buffer queue')
+    // The queue view can be a minute old. editPost has to send the text back, so it is read
+    // fresh right before the write: an edit made in Buffer meanwhile is kept, not overwritten.
+    const { post } = await this.call<{ post: BufferPost | null }>(POST_QUERY, { id: postId }, 'interactive')
+    if (!post || !(QUEUE_STATUSES as readonly string[]).includes(post.status)) throw new Error('That post is no longer in your Buffer queue')
     const data = await this.call<{ editPost: { post?: BufferPost; message?: string } }>(SET_POST_TAGS_MUTATION, tagEditVariables(post, tagId, on), 'interactive')
     if (!data.editPost.post) throw new Error(data.editPost.message ?? 'Buffer could not update the post')
     await this.ctx.storage.delete('queueCache')
