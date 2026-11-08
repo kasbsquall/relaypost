@@ -156,6 +156,11 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
     await env.REGISTRY.get(env.REGISTRY.idFromName('global')).register(pending.code, accountId)
     return json({ ...pending, bot: env.TELEGRAM_BOT_USERNAME })
   }
+  if (request.method === 'PATCH' && path.startsWith('/api/destinations/')) {
+    const b = await body<{ label?: string }>(request)
+    await stub.renameDestination(path.split('/').pop()!, b.label ?? '')
+    return json({ ok: true })
+  }
   if (request.method === 'DELETE' && path.startsWith('/api/destinations/')) {
     await stub.removeDestination(path.split('/').pop()!)
     return json({ ok: true })

@@ -458,6 +458,15 @@ export class AccountDO extends DurableObject<Env> {
     await this.ctx.storage.put('relays', relays.map((r) => (r.postId === postId && r.destinationId === destinationId && r.status !== 'waiting' ? { ...r, hidden: true } : r)))
   }
 
+  // Keeps the destination, its rules and its history; only the shown name changes.
+  async renameDestination(id: string, label: string): Promise<void> {
+    const name = label.trim().slice(0, 60)
+    if (!name) throw new Error('Name is required')
+    const list = await this.list<StoredDestination>('destinations')
+    if (!list.some((d) => d.id === id)) throw new Error('Unknown destination')
+    await this.ctx.storage.put('destinations', list.map((d) => (d.id === id ? { ...d, label: name } : d)))
+  }
+
   async removeDestination(id: string): Promise<void> {
     if ((await this.ctx.storage.get<string>('noticeDestinationId')) === id) await this.ctx.storage.delete('noticeDestinationId')
     await this.ctx.storage.put('destinations', (await this.list<StoredDestination>('destinations')).filter((d) => d.id !== id))
