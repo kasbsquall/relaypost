@@ -271,7 +271,7 @@ function friendly(r) {
     const at = new Date(r.checkAt)
     return { cls: 'wait', ic: 'hourglass-medium', head: r.attempts ? 'Trying again' : 'Waiting for Buffer', sub: r.attempts ? `${d}. Next try at ${hm(at)}.` : `Hands off after Buffer publishes it, about ${hm(at)}.` }
   }
-  if (r.status === 'skipped') return { cls: 'skip', ic: 'skip-forward', head: 'Skipped', sub: d }
+  if (r.status === 'skipped') return { cls: 'skipped', ic: 'skip-forward', head: 'Skipped', sub: d }
   let sub = d
   if (/Discord answered HTTP 404/.test(d)) sub = 'The webhook was deleted in Discord.'
   else if (/Discord answered HTTP (401|403)/.test(d)) sub = 'Discord no longer accepts this webhook.'

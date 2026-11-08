@@ -185,7 +185,7 @@ tbody tr{animation:rise .24s var(--ease-out) both;animation-delay:calc(240ms + v
 .status{display:flex;gap:7px;align-items:flex-start;font-size:13px;line-height:1.4;max-width:330px}
 .status .ic{margin-top:1px}
 .status.ok{color:var(--ok)}
-.status.wait,.status.skip{color:var(--calm-text)}
+.status.wait,.status.skipped{color:var(--calm-text)}
 .status.wait .ic{animation:spin 7s linear infinite}
 .status.fail{color:var(--fail)}
 .status p{margin:0}
