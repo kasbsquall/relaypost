@@ -41,7 +41,7 @@ const SERVICE_NAMES = {
 }
 export const serviceIcon = (service) => SERVICE_ICONS[service] ?? 'globe'
 export const serviceName = (service) => SERVICE_NAMES[service] ?? service
-const DEST_KINDS = { discord: ['discord-logo', 'Discord'], telegram: ['telegram-logo', 'Telegram'], slack: ['slack-logo', 'Slack'] }
+const DEST_KINDS = { discord: ['discord-logo', 'Discord'], telegram: ['telegram-logo', 'Telegram'], slack: ['slack-logo', 'Slack'], reddit: ['reddit-logo', 'Reddit'] }
 export const destIcon = (kind) => (DEST_KINDS[kind] ?? DEST_KINDS.discord)[0]
 export const destKindName = (kind) => (DEST_KINDS[kind] ?? DEST_KINDS.discord)[1]
 

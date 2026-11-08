@@ -1,6 +1,6 @@
 # Relaypost
 
-What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, usually within 45 seconds of Buffer publishing it.
+What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, usually within 45 seconds of Buffer publishing it. For Reddit, it hands you a ready-to-post draft.
 
 Live: https://relaypost.kevin2005-10.workers.dev
 
@@ -8,7 +8,7 @@ Built on the Buffer API for Buffer Commit 2026. Relaypost is an independent app;
 
 ## The problem
 
-Telegram, Discord and Tumblr are the 2nd, 3rd and 4th most requested channels on Buffer's own request board (1,452, 1,364 and 1,328 votes, read on 3 Nov 2026 at suggestions.buffer.com), all still under review. People who run a community there schedule the week in Buffer and then paste the same announcement into Telegram and Discord by hand, or forget to.
+Reddit, Telegram and Discord are the most requested channels on Buffer's own request board (3,008, 1,452 and 1,364 votes, read on 3 Nov 2026 at suggestions.buffer.com), all still under review. People who run a community there schedule the week in Buffer and then paste the same announcement into Telegram, Discord and Reddit by hand, or forget to.
 
 ## Try it in a minute
 
@@ -23,12 +23,14 @@ Everything sent to the public channel is public, and each account can send up to
 
 - **Rules, two kinds.** Everything from a Buffer channel ("all of LinkedIn goes to #announcements"), or only posts with a tag. Tag rules live in Buffer itself, so a post can be routed from Buffer's own composer, the mobile app or any other client.
 - **Waits for Buffer's confirmation.** A handoff fires only after Buffer reports the post as sent. If Buffer failed or the post was deleted, nothing is relayed and the history says why.
-- **Formats each destination on its own terms.** A Discord embed with the image and a link to the original; a Telegram photo with caption, or a message when there is no image, within Telegram's 1,024 and 4,096 character limits; a Slack Block Kit message with `<`, `>` and `&` escaped so a stray `@channel` stays inert. The post sheet previews all three before it goes.
+- **Formats each destination on its own terms.** A Discord embed with the image and a link to the original; a Telegram photo with caption, or a message when there is no image, within Telegram's 1,024 and 4,096 character limits; a Slack Block Kit message with `<`, `>` and `&` escaped so a stray `@channel` stays inert. The post sheet previews all of them, Reddit included, before it goes.
+- **Reddit, as a draft.** Reddit no longer lets new apps post through its API. So when Buffer publishes, Relaypost builds the Reddit post for you: the subreddit's submit page with the title (the first sentence) and the text filled in, plus the link to the original. You check it and press Post.
+- **Notices.** Pick one Slack, Discord or Telegram channel and Relaypost tells it when Buffer fails to publish a post it was handing off, once per post, and when a Reddit draft is ready, with the draft link. A failed post in Buffer stops being something you find out about days later.
 - **Shows its work.** Each handoff records how many seconds after the scheduled minute it landed, how many tries it took, and links to the delivered message in Telegram or Discord. Failed handoffs can be sent again by hand; a deleted webhook asks for a new one instead.
 
 ## Why not Zapier or IFTTT
 
-They can forward a post, but they fire on their own trigger. Relaypost is built around Buffer's queue: it reads the scheduled posts, shows them on a timeline with what will hand off where, waits for Buffer's `sent` status, writes routing tags back to Buffer so the rules survive outside the app, and keeps a history with the handoff time of every post. Setup is a Buffer login, one pasted webhook or one bot invite, and a switch.
+They can forward a post, but they fire on their own trigger. Relaypost is built around Buffer's queue: it reads the scheduled posts, shows them on a timeline with what will hand off where, waits for Buffer's `sent` status, writes routing tags back to Buffer so the rules survive outside the app, keeps a history with the handoff time of every post, and tells your team when Buffer itself fails to publish. Setup is a Buffer login, one pasted webhook or one bot invite, and a switch.
 
 ## How it is built
 

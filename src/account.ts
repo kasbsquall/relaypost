@@ -30,11 +30,15 @@ import {
   isDiscordWebhook,
   isSlackWebhook,
   sendDiscord,
+  sendNotice,
   sendSlack,
   sendTelegram,
+  serviceName,
   slackPayload,
   type DeliveryResult,
+  type NoticeKind,
 } from './relay/deliver'
+import { normalizeSubreddit, redditDraft } from './relay/reddit'
 import {
   MAX_DELIVERY_ATTEMPTS,
   RETRY_DELAY_MS,
@@ -89,6 +93,11 @@ const DEMO_TAG = 'Relaypost demo'
 // The public demo channel is open to any Buffer account; this keeps one account from flooding it.
 const DEMO_DAILY_LIMIT = 3
 const DAY_MS = 86_400_000
+// A failed post is announced once, even when it was headed to several destinations.
+const NOTICE_MEMORY_MS = 14 * DAY_MS
+// Discord caps a message at 2,000 characters; a notice that would not fit with its draft link points to the app instead.
+const NOTICE_MAX = 1900
+const NOTICE_KINDS: readonly DestinationKind[] = ['discord', 'telegram', 'slack']
 
 export class NotConnectedError extends Error {}
 
@@ -214,6 +223,7 @@ export class AccountDO extends DurableObject<Env> {
       organizationId: profile.organizationId,
       connected: (await this.tokens()) !== null,
       destinations: destinations.map(({ id, kind, label, createdAt, demo }) => ({ id, kind, label, createdAt, demo: Boolean(demo) })),
+      noticeDestinationId: (await this.ctx.storage.get<string>('noticeDestinationId')) ?? null,
       pendingTelegram: pending && pending.expiresAt > Date.now() ? pending : null,
       rules: await this.list<Rule>('rules'),
       relays: (await this.list<Relay>('relays')).filter((r) => !r.hidden).sort((a, b) => b.dueAt - a.dueAt).slice(0, 60),
@@ -289,6 +299,68 @@ export class AccountDO extends DurableObject<Env> {
     const test = await sendSlack(url, { text: 'Relaypost is connected. Posts you route here will show up in this channel.' })
     if (!test.ok) throw new Error(`Slack did not accept the test message (${test.detail})`)
     return this.storeDestination('slack', label || 'Slack', url)
+  }
+
+  // Reddit closed its API to new apps: a Reddit destination gets a ready-to-post
+  // draft (Reddit's submit page, filled in) instead of a delivered message.
+  async addReddit(label: string, subreddit: string): Promise<{ id: string }> {
+    const name = normalizeSubreddit(subreddit)
+    if (!name) throw new Error('That is not a subreddit name. Write it like r/yoursubreddit')
+    await this.assertRoomForDestination()
+    return this.storeDestination('reddit', label || `r/${name}`, name)
+  }
+
+  // ----------------------------------------------------------------- notices
+
+  // One channel hears when Buffer fails to publish a post Relaypost was going to
+  // hand off, and when a Reddit draft is ready. null turns notices off.
+  async setNoticeDestination(destinationId: string | null): Promise<{ noticeDestinationId: string | null }> {
+    if (destinationId === null) {
+      await this.ctx.storage.delete('noticeDestinationId')
+      return { noticeDestinationId: null }
+    }
+    const dest = (await this.list<StoredDestination>('destinations')).find((d) => d.id === destinationId)
+    if (!dest) throw new Error('Unknown destination')
+    if (dest.demo || !NOTICE_KINDS.includes(dest.kind)) throw new Error('Notices go to a Discord, Telegram or Slack channel of your own')
+    const target = await unseal(dest.sealedTarget, this.env.TOKEN_KEY, 'destination')
+    const test = await sendNotice(dest.kind as NoticeKind, target, 'Relaypost notices are on. This channel will hear when Buffer fails to publish a post Relaypost was handing off, and when a Reddit draft is ready to post.', this.env.TELEGRAM_BOT_TOKEN)
+    if (!test.ok) throw new Error(`The channel did not accept the test notice (${test.detail})`)
+    await this.ctx.storage.put('noticeDestinationId', destinationId)
+    return { noticeDestinationId: destinationId }
+  }
+
+  // Never throws: a notice that cannot be sent must not hold up a handoff.
+  private async notify(text: string): Promise<void> {
+    try {
+      const id = await this.ctx.storage.get<string>('noticeDestinationId')
+      if (!id) return
+      const dest = (await this.list<StoredDestination>('destinations')).find((d) => d.id === id)
+      if (!dest || !NOTICE_KINDS.includes(dest.kind)) return
+      const target = await unseal(dest.sealedTarget, this.env.TOKEN_KEY, 'destination')
+      const res = await sendNotice(dest.kind as NoticeKind, target, text, this.env.TELEGRAM_BOT_TOKEN)
+      if (!res.ok) console.error(JSON.stringify({ event: 'notice_failed', detail: res.detail }))
+    } catch (err) {
+      console.error(JSON.stringify({ event: 'notice_failed', message: err instanceof Error ? err.message : String(err) }))
+    }
+  }
+
+  private async notifyFailure(post: BufferPost, detail: string, now: number): Promise<void> {
+    const noticed = (await this.ctx.storage.get<Record<string, number>>('noticed')) ?? {}
+    if (noticed[post.id]) return
+    const fresh = Object.fromEntries(Object.entries(noticed).filter(([, at]) => now - at < NOTICE_MEMORY_MS))
+    await this.ctx.storage.put('noticed', { ...fresh, [post.id]: now })
+    const text = post.text.replace(/\s+/g, ' ').trim()
+    const preview = text.length > 80 ? `${text.slice(0, 79)}…` : text || '(media only)'
+    const when = post.dueAt ? `${new Date(post.dueAt).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'its scheduled time'
+    await this.notify(`Buffer did not publish your ${serviceName(post.channelService)} post "${preview}", scheduled for ${when}. ${detail}. Relaypost handed nothing off. Check it in Buffer: https://publish.buffer.com`)
+  }
+
+  private appOrigin(): string {
+    try {
+      return new URL(this.env.REDIRECT_URI).origin
+    } catch {
+      return ''
+    }
   }
 
   // Step 1 of linking a Telegram channel: a one-time code the user posts in the
@@ -387,6 +459,7 @@ export class AccountDO extends DurableObject<Env> {
   }
 
   async removeDestination(id: string): Promise<void> {
+    if ((await this.ctx.storage.get<string>('noticeDestinationId')) === id) await this.ctx.storage.delete('noticeDestinationId')
     await this.ctx.storage.put('destinations', (await this.list<StoredDestination>('destinations')).filter((d) => d.id !== id))
     await this.ctx.storage.put('rules', (await this.list<Rule>('rules')).filter((r) => r.destinationId !== id))
   }
@@ -478,7 +551,10 @@ export class AccountDO extends DurableObject<Env> {
       const decision = decide(post, relay, now)
       let next: Relay
       if (decision.action === 'wait') next = { ...relay, checkAt: decision.checkAt }
-      else if (decision.action === 'fail') next = { ...relay, status: 'failed', detail: decision.detail }
+      else if (decision.action === 'fail') {
+        next = { ...relay, status: 'failed', detail: decision.detail }
+        if (post) await this.notifyFailure(post, decision.detail, now)
+      }
       else if (decision.action === 'skip') next = { ...relay, status: 'skipped', detail: decision.detail }
       else {
         try {
@@ -500,12 +576,21 @@ export class AccountDO extends DurableObject<Env> {
       return { ...relay, status: 'skipped', detail: `The public channel takes ${DEMO_DAILY_LIMIT} posts a day per account` }
     }
     const target = await unseal(destination.sealedTarget, this.env.TOKEN_KEY, 'destination')
-    const result: DeliveryResult =
-      destination.kind === 'discord'
-        ? await sendDiscord(target, discordPayload(post))
-        : destination.kind === 'slack'
-          ? await sendSlack(target, slackPayload(post))
-          : await sendTelegram(this.env.TELEGRAM_BOT_TOKEN, target, post)
+    if (destination.kind === 'reddit') return this.draftForReddit(relay, post, target)
+    let result: DeliveryResult
+    switch (destination.kind) {
+      case 'discord':
+        result = await sendDiscord(target, discordPayload(post))
+        break
+      case 'slack':
+        result = await sendSlack(target, slackPayload(post))
+        break
+      case 'telegram':
+        result = await sendTelegram(this.env.TELEGRAM_BOT_TOKEN, target, post)
+        break
+      default:
+        return { ...relay, status: 'skipped', detail: 'Unknown destination type' }
+    }
     const attempts = relay.attempts + 1
     if (result.ok) {
       const messageLink = result.link ?? (result.discordMessage ? discordMessageLink(await this.guildOf(destination, target), result.discordMessage) : null)
@@ -513,6 +598,15 @@ export class AccountDO extends DurableObject<Env> {
     }
     if (result.retryable && attempts < MAX_DELIVERY_ATTEMPTS) return { ...relay, attempts, detail: result.detail, checkAt: now + RETRY_DELAY_MS }
     return { ...relay, status: 'failed', attempts, detail: result.detail }
+  }
+
+  // A Reddit "handoff" is a draft ready the moment Buffer publishes; the person posts it.
+  private async draftForReddit(relay: Relay, post: BufferPost, subreddit: string): Promise<Relay> {
+    const draft = redditDraft(post, subreddit)
+    const lead = `Reddit draft ready for r/${subreddit}: "${draft.title}". Open it, check it and press Post: `
+    const link = lead.length + draft.url.length <= NOTICE_MAX ? draft.url : `${this.appOrigin()}/#history`
+    await this.notify(lead + link)
+    return { ...relay, status: 'delivered', attempts: relay.attempts + 1, detail: `Draft ready for r/${subreddit}`, externalLink: post.externalLink, deliveredAt: Date.now(), messageLink: draft.url }
   }
 
   private async demoSentToday(destinationId: string, now: number): Promise<number> {

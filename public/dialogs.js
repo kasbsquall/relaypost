@@ -78,6 +78,13 @@ function landsPreview(kind, p, ch) {
         <p class="m-title">Open on ${esc(service)}</p><p class="m-text">${esc(c.text)}</p>${img}
         <p class="m-foot">Also on ${esc(service)} · relayed by Relaypost</p></div></div>` }
   }
+  if (kind === 'reddit') {
+    const firstLine = text.split('\n').map((l) => l.trim()).find(Boolean) ?? ''
+    const title = (/^.{12,}?[.!?](?=\s|$)/.exec(firstLine)?.[0] ?? firstLine) || `New post from ${service}`
+    const body = text.trim() === title ? '' : text.trim()
+    return { note: 'A draft, not a post: it opens Reddit with this filled in, and you press Post. The link to the original is added once Buffer publishes.',
+      html: `<div class="mock reddit"><p class="m-title">${esc(title)}</p>${body ? `<p class="m-text">${esc(body)}</p>` : ''}<p class="m-foot">Originally posted on ${esc(service)}: link once published</p></div>` }
+  }
   if (kind === 'slack') {
     const escaped = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
     const c = escaped.length <= LIMITS.slack ? clipped(text, LIMITS.slack) : { text: `${escaped.slice(0, LIMITS.slack - 1)}…`.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'), cut: true }
@@ -128,7 +135,9 @@ function renderSheetDests(p, ch, due) {
     const tagName = tagRule?.match.tagName ?? defaultTag(d)
     let why
     if (byChannel) why = `Sent by your ${channel} rule: every post from ${channel} goes here. Change that in Rules.`
-    else if (on.has(d.id)) why = `Goes to ${d.label} at ${hm(due)} ${dayPhrase(due)}, right after ${channel}. Turning it off removes the tag "${tagName}" in Buffer.`
+    else if (on.has(d.id)) why = d.kind === 'reddit'
+      ? `A draft for ${d.label} is ready at ${hm(due)} ${dayPhrase(due)}, right after ${channel}. Turning it off removes the tag "${tagName}" in Buffer.`
+      : `Goes to ${d.label} at ${hm(due)} ${dayPhrase(due)}, right after ${channel}. Turning it off removes the tag "${tagName}" in Buffer.`
     else why = `Not relayed. Turning it on adds the tag "${tagName}" to this post in Buffer.`
     return `<div class="drow"><span class="st-icon">${icon(destIcon(d.kind))}</span>
       ${byChannel ? `<b class="dlabel">${esc(d.label)}</b>` : `<label for="sw-${esc(d.id)}">${esc(d.label)}</label>`}
@@ -186,6 +195,7 @@ function selectTab(kind) {
   $('#panel-discord').hidden = kind !== 'discord'
   $('#panel-telegram').hidden = kind !== 'telegram'
   $('#panel-slack').hidden = kind !== 'slack'
+  $('#panel-reddit').hidden = kind !== 'reddit'
 }
 const destTabs = [...destDialog.querySelectorAll('[role="tab"]')]
 destTabs.forEach((t, i) => {
@@ -203,11 +213,13 @@ export function addDestinationDialog(kind = 'discord') {
   $('#discord-error').hidden = true
   $('#slack-form').reset()
   $('#slack-error').hidden = true
+  $('#reddit-form').reset()
+  $('#reddit-error').hidden = true
   $('#tg-code-box').hidden = true
   $('#tg-error').hidden = true
   $('#tg-get').disabled = false
   $('#tg-bot').textContent = app.state.telegramBot ? `@${app.state.telegramBot}` : 'the Relaypost bot'
-  selectTab(['telegram', 'slack'].includes(kind) ? kind : 'discord')
+  selectTab(['telegram', 'slack', 'reddit'].includes(kind) ? kind : 'discord')
   if (sheet.open) sheet.close()
   destDialog.showModal()
 }
@@ -238,6 +250,28 @@ const webhookSubmit = (kind) => async (e) => {
 }
 $('#discord-form').addEventListener('submit', webhookSubmit('discord'))
 $('#slack-form').addEventListener('submit', webhookSubmit('slack'))
+
+$('#reddit-form').addEventListener('submit', async (e) => {
+  e.preventDefault()
+  const f = e.currentTarget
+  const btn = f.querySelector('button[type="submit"]')
+  const err = $('#reddit-error')
+  err.hidden = true
+  btn.disabled = true
+  try {
+    await api('/api/destinations/reddit', 'POST', { subreddit: f.subreddit.value.trim(), label: f.label.value.trim() })
+    await loadState()
+    renderAll({ settled: true })
+    destDialog.close()
+    play('added')
+    toast('Subreddit added. Make a rule, and each matching post becomes a draft ready to post.')
+  } catch (ex) {
+    err.hidden = false
+    err.innerHTML = `${icon('warning-circle')}<span>${esc(ex.message)}</span>`
+  } finally {
+    btn.disabled = false
+  }
+})
 
 $('#tg-get').addEventListener('click', async (e) => {
   const btn = e.currentTarget

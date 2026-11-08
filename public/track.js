@@ -16,7 +16,7 @@ function destDots(p, stations) {
 
 function ariaFor(p, lane, stations) {
   const names = p.dests.map((id) => stations.find((s) => s.id === id)?.name).filter(Boolean)
-  const where = names.length ? `relays to ${names.join(' and ')}` : 'stays in Buffer only'
+  const where = names.length ? `relays to ${names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`}` : 'stays in Buffer only'
   return `${lane.name}, ${longWhen(p.due)}: ${p.text.slice(0, 120)}. ${where}. Open details.`
 }
 
@@ -77,7 +77,9 @@ function renderHorizontal(W, ctx) {
   const AX = 44
   // Few channels get taller lanes so the track keeps its weight on screen.
   const LH = n > 6 ? 62 : Math.max(72, Math.min(132, (260 - AX - 14) / n))
-  const TH = Math.max(AX + n * LH + 14, AX + stations.length * 104 + 24, stations.length ? 0 : AX + 196)
+  // A full station needs about 132 px; a compact one (a single line) about 84.
+  const perStation = stations.length >= 3 ? 94 : 142
+  const TH = Math.max(AX + n * LH + 14, AX + stations.length * perStation + 24, stations.length ? 0 : AX + 196)
   const labelW = 196
   const zoneW = Math.min(380, Math.max(320, W * 0.27))
   const nowX = W - zoneW
@@ -98,7 +100,8 @@ function renderHorizontal(W, ctx) {
     const xl = ticks[i + 2]
     if (i % 2 === 0) s += `<rect x="${xl}" y="${AX}" width="${xr - xl}" height="${TH - AX}" fill="oklch(97% .005 70)" fill-opacity=".045"/>`
     s += `<line x1="${xr}" x2="${xr}" y1="${AX - 10}" y2="${TH}" stroke="var(--lane)" stroke-opacity=".22"/>`
-    if (xr - xl > 46) dayLabels += `<span class="axis-label num" style="left:${xr - 8}px;top:${AX / 2 - 9}px;transform:translateX(-100%)">${dayShort(m)} ${m.getDate()}</span>`
+    // Skip a day label that would run into the "Later" marker at the far left.
+    if (xr - xl > 46 && xr - labelW > 130) dayLabels += `<span class="axis-label num" style="left:${xr - 8}px;top:${AX / 2 - 9}px;transform:translateX(-100%)">${dayShort(m)} ${m.getDate()}</span>`
   })
   s += `<line x1="0" x2="${W}" y1="${AX}" y2="${AX}" stroke="var(--lane)" stroke-opacity=".28"/>`
   for (let i = 1; i < n; i++) s += `<line x1="${labelW}" x2="${nowX}" y1="${laneY(i)}" y2="${laneY(i)}" stroke="var(--lane)" stroke-opacity=".5" stroke-width="1.5"/>`

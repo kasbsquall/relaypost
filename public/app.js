@@ -122,19 +122,29 @@ function ruleSummary(destId) {
 
 const handoffSeconds = (r) => Math.max(0, Math.round((r.deliveredAt - r.dueAt) / 1000))
 
+// With three or more destinations a station keeps one line, the last handoff; the rules live in the Rules panel.
+export const COMPACT_STATIONS = 3
+
 function stations() {
+  const compact = app.state.destinations.length >= COMPACT_STATIONS
   return app.state.destinations.map((d) => {
     const mine = app.state.relays.filter((r) => r.destinationId === d.id && r.status !== 'waiting')
     const last = mine[0]
-    const lines = [{ icon: 'funnel-simple', text: ruleSummary(d.id) }]
-    if (last?.status === 'delivered') lines.push({ cls: 'ok', icon: 'check-circle', text: `Last handoff +${handoffSeconds(last)} s, ${dayPhrase(new Date(last.deliveredAt))}` })
-    else if (last?.status === 'failed') lines.push({ cls: 'fail', icon: 'warning-circle', text: 'Last handoff failed. See history.' })
-    else lines.push({ icon: 'hourglass-medium', text: 'No handoffs yet' })
-    return { id: d.id, name: d.label, place: `${destKindName(d.kind)} channel`, icon: destIcon(d.kind), lines }
+    const verb = d.kind === 'reddit' ? 'Last draft' : 'Last handoff'
+    const lines = compact ? [] : [{ icon: 'funnel-simple', text: ruleSummary(d.id) }]
+    if (last?.status === 'delivered') lines.push({ cls: 'ok', icon: 'check-circle', text: compact ? `+${handoffSeconds(last)} s · ${dateShort(new Date(last.deliveredAt))}` : `${verb} +${handoffSeconds(last)} s, ${dayPhrase(new Date(last.deliveredAt))}` })
+    else if (last?.status === 'failed') lines.push({ cls: 'fail', icon: 'warning-circle', text: compact ? 'Last one failed' : 'Last handoff failed. See history.' })
+    else lines.push({ icon: 'hourglass-medium', text: compact ? 'Nothing yet' : 'No handoffs yet' })
+    return { id: d.id, name: d.label, place: d.kind === 'reddit' ? 'Subreddit, drafts' : `${destKindName(d.kind)} channel`, icon: destIcon(d.kind), lines }
   })
 }
 
 // ------------------------------------------------------------------- head
+
+const andList = (items) => (items.length < 2 ? items.join('') : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`)
+
+// Reddit drafts are prepared, not delivered, so they never count as a handoff time.
+const lastHandoff = () => app.state.relays.find((r) => r.status === 'delivered' && !(r.detail ?? '').startsWith('Draft ready'))
 
 function renderHead() {
   const posts = trackPosts().filter((p) => p.due - Date.now() < 7 * 864e5)
@@ -145,8 +155,15 @@ function renderHead() {
     strong.textContent = 'Reading your Buffer queue.'
     rest.textContent = ''
   } else if (!posts.length) {
-    strong.textContent = 'Nothing is scheduled in Buffer for the next seven days.'
-    rest.textContent = 'Posts you schedule there show up on this track.'
+    // An empty week still shows proof: the last real handoff, and one way to see the next.
+    const last = lastHandoff()
+    const tryIt = app.state.demo && !app.state.destinations.some((d) => d.demo)
+      ? ' No community of your own? Add the public channel in Destinations and watch it land there.'
+      : ''
+    strong.textContent = last
+      ? `Your last handoff landed ${handoffSeconds(last)} seconds after its scheduled minute.`
+      : 'Nothing is scheduled in Buffer for the next seven days.'
+    rest.textContent = `Schedule a post in Buffer and it shows up on this track.${tryIt}`
   } else {
     strong.textContent = relayed.length === 0
       ? `None of this week's ${word(posts.length).toLowerCase()} ${posts.length === 1 ? 'post hands' : 'posts hand'} off yet.`
@@ -155,7 +172,7 @@ function renderHead() {
       : `${word(relayed.length)} of this week's ${word(posts.length).toLowerCase()} posts ${relayed.length === 1 ? 'hands' : 'hand'} off to your community.`
     const next = relayed[0]
     rest.textContent = next
-      ? `The next one goes to ${next.dests.map((id) => destOf(id)?.label).filter(Boolean).join(' and ')} at ${hm(next.due)} ${dayPhrase(next.due)}, right after ${lanes().find((l) => l.id === next.laneId)?.name ?? 'Buffer'}.`
+      ? `The next one goes to ${andList(next.dests.map((id) => destOf(id)?.label).filter(Boolean))} at ${hm(next.due)} ${dayPhrase(next.due)}, right after ${lanes().find((l) => l.id === next.laneId)?.name ?? 'Buffer'}.`
       : app.state.destinations.length
         ? 'None is set to relay yet. Open a post and turn on a destination, or add a rule.'
         : 'Add a Discord, Telegram or Slack destination to start relaying.'
@@ -166,6 +183,7 @@ function renderHead() {
 
   const value = $('#clock-value')
   const next = relayed[0]
+  $('#clock-label').textContent = !next && app.queue !== null && lastHandoff() ? 'Last handoff' : 'Next handoff'
   if (app.queue === null) {
     value.className = 'clock-value num'
     value.innerHTML = '<span class="skel" style="display:inline-block;width:180px;height:56px"></span>'
@@ -177,6 +195,13 @@ function renderHead() {
     value.setAttribute('aria-label', `in ${parts.map(([n, u]) => `${n} ${u}`).join(' ')}`)
     const lane = lanes().find((l) => l.id === next.laneId)
     $('#clock-sub').textContent = `${dateShort(next.due)}, ${hm(next.due)} · ${lane?.name ?? 'Buffer'} to ${destOf(next.dests[0])?.label ?? ''}`
+  } else if (lastHandoff()) {
+    const last = lastHandoff()
+    const lane = lanes().find((l) => l.id === last.channelId)
+    value.className = 'clock-value num'
+    value.innerHTML = `+${handoffSeconds(last)}<span class="u">s</span>`
+    value.setAttribute('aria-label', `last handoff, ${handoffSeconds(last)} seconds`)
+    $('#clock-sub').textContent = `Last handoff · ${dateShort(new Date(last.dueAt))}, ${hm(new Date(last.dueAt))} · ${lane?.name ?? serviceName(channelOf(last.channelId)?.service)} to ${destOf(last.destinationId)?.label ?? 'a removed destination'}. Nothing scheduled next.`
   } else {
     value.className = 'clock-value quiet'
     value.textContent = 'None scheduled'
@@ -233,6 +258,9 @@ export function drawTrack(settled = false) {
 
 function friendly(r) {
   const d = r.detail ?? ''
+  if (r.status === 'delivered' && destOf(r.destinationId)?.kind === 'reddit') {
+    return { cls: 'ok', ic: 'check-circle', head: 'Draft ready', sub: 'Opens Reddit with the post filled in. You press Post.' }
+  }
   if (r.status === 'delivered') {
     const notes = []
     if (r.attempts > 1) notes.push(`Got through on try ${r.attempts}.`)
@@ -258,7 +286,9 @@ const isHttps = (u) => /^https:\/\//.test(u ?? '')
 // The delivered message in its destination first, the original post second.
 function rowLinks(r, dest) {
   const out = []
-  if (isHttps(r.messageLink)) out.push(`<a class="link" href="${esc(r.messageLink)}" target="_blank" rel="noopener">In ${destKindName(dest?.kind)}${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>`)
+  if (dest?.kind === 'reddit' && isHttps(r.messageLink)) {
+    out.push(`<a class="btn dark" href="${esc(r.messageLink)}" target="_blank" rel="noopener">${icon('reddit-logo')}Post on Reddit<span class="sr"> (opens in a new tab)</span></a>`)
+  } else if (isHttps(r.messageLink)) out.push(`<a class="link" href="${esc(r.messageLink)}" target="_blank" rel="noopener">In ${destKindName(dest?.kind)}${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>`)
   if (isHttps(r.externalLink)) out.push(`<a class="link" href="${esc(r.externalLink)}" target="_blank" rel="noopener">Original${icon('arrow-square-out')}<span class="sr"> (opens in a new tab)</span></a>`)
   return out.length ? `<div class="links">${out.join('')}</div>` : ''
 }
@@ -311,14 +341,26 @@ function renderRules() {
   $('#rules-list').hidden = rules.length === 0
 }
 
+const NOTICE_KINDS = ['discord', 'telegram', 'slack']
+
 function renderDestinations() {
   const list = app.state.destinations
-  $('#dest-list').innerHTML = list.map((d) => `<li class="item"><div>
-      <div class="item-when">${icon(destIcon(d.kind))}${destKindName(d.kind)} channel · added ${esc(dateShort(new Date(d.createdAt)))}</div>
+  const noticeId = app.state.noticeDestinationId
+  $('#dest-list').innerHTML = list.map((d) => {
+    const canNotice = NOTICE_KINDS.includes(d.kind) && !d.demo
+    const on = noticeId === d.id
+    const bell = canNotice
+      ? `<button class="notice-btn" type="button" data-act="notice" data-id="${esc(d.id)}" aria-pressed="${on}" title="${on ? 'Notices go here. Press to turn them off.' : 'Send notices here'}">${icon('bell-simple')}<span>${on ? 'Notices on' : 'Notices'}</span><span class="sr"> for ${esc(d.label)}</span></button>`
+      : ''
+    const what = d.kind === 'reddit' ? 'Subreddit, gets drafts' : `${destKindName(d.kind)} channel`
+    return `<li class="item"><div>
+      <div class="item-when">${icon(destIcon(d.kind))}${what} · added ${esc(dateShort(new Date(d.createdAt)))}</div>
       <div class="item-what">${esc(d.label)}</div></div>
-    <button class="icon-btn" type="button" data-act="del-dest" data-id="${esc(d.id)}" aria-label="Remove ${esc(d.label)}">${icon('trash')}</button></li>`).join('')
+    <div class="item-act">${bell}<button class="icon-btn" type="button" data-act="del-dest" data-id="${esc(d.id)}" aria-label="Remove ${esc(d.label)}">${icon('trash')}</button></div></li>`
+  }).join('')
   $('#dest-empty').hidden = list.length > 0
   $('#dest-list').hidden = list.length === 0
+  $('#notice-foot').hidden = !list.some((d) => NOTICE_KINDS.includes(d.kind) && !d.demo)
 }
 
 // Judge mode: anyone can watch a handoff land without making a channel of their own.
@@ -423,6 +465,15 @@ async function onAction(e) {
       if (relay.status === 'delivered') { play('handoff'); toast('Sent again. It landed.') }
       else toast(`Still not through: ${relay.detail || 'the destination refused it'}.`, true)
       return
+    }
+    if (act === 'notice') {
+      const on = el.getAttribute('aria-pressed') === 'true'
+      el.disabled = true
+      await api('/api/notices', 'POST', { destinationId: on ? null : el.dataset.id })
+      await loadState()
+      play('toggle')
+      toast(on ? 'Notices are off.' : 'Notices are on. A test notice is in that channel.')
+      return renderAll({ settled: true })
     }
     if (act === 'add-demo') {
       el.disabled = true

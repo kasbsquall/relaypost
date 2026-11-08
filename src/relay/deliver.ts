@@ -201,3 +201,30 @@ export async function sendSlack(webhookUrl: string, payload: Record<string, unkn
     return { ok: false, detail: 'Could not reach Slack', retryable: true }
   }
 }
+
+// --- Notices: a short plain-text heads-up to the channel the user picked.
+
+export type NoticeKind = 'discord' | 'telegram' | 'slack'
+
+// A notice never holds up a handoff for long: a destination that hangs is given up on.
+export const NOTICE_TIMEOUT_MS = 5000
+
+export async function sendNotice(
+  kind: NoticeKind,
+  target: string,
+  text: string,
+  botToken: string,
+  fetcher: typeof fetch = fetch,
+): Promise<DeliveryResult> {
+  const timed = ((input: RequestInfo | URL, init?: RequestInit) => fetcher(input, { ...init, signal: AbortSignal.timeout(NOTICE_TIMEOUT_MS) })) as typeof fetch
+  if (kind === 'discord') return sendDiscord(target, { content: clip(text, 2000), allowed_mentions: { parse: [] } }, timed)
+  if (kind === 'slack') return sendSlack(target, { text: slackEscape(text), unfurl_links: false, unfurl_media: false }, timed)
+  try {
+    const res = await telegramCall(botToken, 'sendMessage', { chat_id: target, text: clip(text, TELEGRAM_TEXT_MAX), link_preview_options: { is_disabled: true } }, timed)
+    return res.ok
+      ? { ok: true, detail: 'Notice sent to Telegram', retryable: false }
+      : { ok: false, detail: `Telegram refused it: ${res.description ?? `HTTP ${res.status}`}`, retryable: res.status === 429 || res.status >= 500 }
+  } catch {
+    return { ok: false, detail: 'Could not reach Telegram', retryable: true }
+  }
+}

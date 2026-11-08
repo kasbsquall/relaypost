@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Relaypost</title>
-<meta name="description" content="What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, less than a minute later.">
+<meta name="description" content="What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, less than a minute later. For Reddit, a ready-to-post draft.">
 <meta name="theme-color" content="#f4f4f1">
 <link rel="icon" href="/img/mark.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -55,7 +55,7 @@
       <h1 id="hero-title">What you schedule in Buffer also lands in <em>Telegram</em>, <em>Discord</em> and <em>Slack</em>, less than a minute later.</h1>
     </div>
     <div class="hero-act">
-      <p>Relaypost watches your Buffer queue. When Buffer publishes a post, the same text, image and link go to your Telegram channel, your Discord server and your team's Slack, usually within 45 seconds. No copy and paste.</p>
+      <p>Relaypost watches your Buffer queue. When Buffer publishes a post, the same text, image and link go to your Telegram channel, your Discord server and your team's Slack, usually within 45 seconds. For Reddit, which no longer lets new apps post, you get the draft ready: one tap, check it, Post. No copy and paste.</p>
       <a class="btn baton-btn big" href="/auth/start"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plugs"></use></svg>Connect Buffer</a>
       <p class="fine"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-info"></use></svg><span>Built on the Buffer API. Relaypost reads your scheduled posts. The only thing it writes is a tag on a post, when you turn a destination on for it.</span></p>
       <p class="connect-note" id="connect-note" role="alert" hidden><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-warning-circle"></use></svg><span></span></p>
@@ -71,7 +71,7 @@
   <ol class="legs rise" style="--b:2">
     <li><span class="leg-n">Leg 1</span><b>Buffer publishes</b><p>You keep scheduling in Buffer the way you do now.</p></li>
     <li><span class="leg-n">Leg 2</span><b>Relaypost takes the baton</b><p>A rule decides what goes where: everything from one channel, or posts with a tag.</p></li>
-    <li><span class="leg-n">Leg 3</span><b>Your community gets it</b><p>Discord and Slack through a webhook you paste, Telegram through the Relaypost bot. The history shows every handoff and how long it took.</p></li>
+    <li><span class="leg-n">Leg 3</span><b>Your community gets it</b><p>Discord and Slack through a webhook you paste, Telegram through the Relaypost bot, Reddit as a filled-in draft. The history shows every handoff and how long it took, and one channel of your choice hears when Buffer fails to publish.</p></li>
   </ol>
 </main>
 
@@ -83,7 +83,7 @@
       <p class="built" id="built"></p>
     </div>
     <div class="clock">
-      <div class="clock-label"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-timer"></use></svg>Next handoff</div>
+      <div class="clock-label"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-timer"></use></svg><span id="clock-label">Next handoff</span></div>
       <div class="clock-value num" id="clock-value"></div>
       <div class="clock-sub num" id="clock-sub"></div>
     </div>
@@ -144,8 +144,9 @@
           <div><h2 id="h-dest">Destinations</h2><p>Where your posts land after Buffer.</p></div>
           <button class="btn act" type="button" data-act="add-dest"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plus"></use></svg>Add</button>
         </div>
-        <p class="panel-empty" id="dest-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>No destinations yet. Add a Discord, Telegram or Slack channel.</span></p>
+        <p class="panel-empty" id="dest-empty"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>No destinations yet. Add a Discord, Telegram or Slack channel, or a subreddit.</span></p>
         <ul class="list" id="dest-list"></ul>
+        <p class="list-foot" id="notice-foot" hidden>Notices: one channel hears when Buffer fails to publish a post Relaypost was handing off, and when a Reddit draft is ready to post.</p>
         <div class="demo" id="demo" hidden>
           <p class="demo-h"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-broadcast"></use></svg>No channel of your own? Use the public one.</p>
           <p class="demo-b" id="demo-body"></p>
@@ -201,6 +202,7 @@
       <button type="button" role="tab" data-kind="discord" aria-controls="panel-discord" aria-selected="true"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-discord-logo"></use></svg>Discord</button>
       <button type="button" role="tab" data-kind="telegram" aria-controls="panel-telegram" aria-selected="false" tabindex="-1"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-telegram-logo"></use></svg>Telegram</button>
       <button type="button" role="tab" data-kind="slack" aria-controls="panel-slack" aria-selected="false" tabindex="-1"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-slack-logo"></use></svg>Slack</button>
+      <button type="button" role="tab" data-kind="reddit" aria-controls="panel-reddit" aria-selected="false" tabindex="-1"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-reddit-logo"></use></svg>Reddit</button>
     </div>
     <div id="panel-discord" role="tabpanel">
       <form class="form" id="discord-form">
@@ -231,6 +233,16 @@
           <small>In Slack: create an app at api.slack.com/apps, turn on Incoming Webhooks, Add New Webhook, pick the channel, copy the URL.</small></label>
         <p class="notice fail" id="slack-error" role="alert" hidden></p>
         <div><button class="btn baton-btn" type="submit"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-paper-plane-tilt"></use></svg><span>Connect and send a test message</span></button></div>
+      </form>
+    </div>
+    <div id="panel-reddit" role="tabpanel" hidden>
+      <p class="panel-note">Reddit no longer lets new apps post for you, so Relaypost prepares the post. When Buffer publishes, a draft opens Reddit's submit page with the title and the text filled in, and you press Post. Turn on notices in Destinations to get each draft in Slack, Discord or Telegram.</p>
+      <form class="form" id="reddit-form">
+        <label class="field">Subreddit<input name="subreddit" required maxlength="80" placeholder="r/yoursubreddit" autocomplete="off" spellcheck="false">
+          <small>Check the subreddit's rules on self-promotion before you post.</small></label>
+        <label class="field">Name in Relaypost (optional)<input name="label" maxlength="60" placeholder="Uses the subreddit name…" autocomplete="off"></label>
+        <p class="notice fail" id="reddit-error" role="alert" hidden></p>
+        <div><button class="btn baton-btn" type="submit"><svg class="ic" aria-hidden="true"><use href="/icons.svg#i-plus"></use></svg><span>Add the subreddit</span></button></div>
       </form>
     </div>
   </div>

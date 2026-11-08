@@ -3,7 +3,7 @@
 
 import type { BufferPost } from '../buffer/queries'
 
-export type DestinationKind = 'discord' | 'telegram' | 'slack'
+export type DestinationKind = 'discord' | 'telegram' | 'slack' | 'reddit'
 
 export interface Destination {
   id: string

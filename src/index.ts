@@ -142,6 +142,14 @@ async function api(request: Request, env: Env, path: string): Promise<Response> 
     const b = await body<{ label?: string; webhookUrl?: string }>(request)
     return json(await stub.addSlack(b.label ?? '', b.webhookUrl ?? ''))
   }
+  if (m === 'POST /api/destinations/reddit') {
+    const b = await body<{ label?: string; subreddit?: string }>(request)
+    return json(await stub.addReddit(b.label ?? '', b.subreddit ?? ''))
+  }
+  if (m === 'POST /api/notices') {
+    const b = await body<{ destinationId?: string | null }>(request)
+    return json(await stub.setNoticeDestination(typeof b.destinationId === 'string' ? b.destinationId : null))
+  }
   if (m === 'POST /api/destinations/telegram') {
     const b = await body<{ label?: string }>(request)
     const pending = await stub.startTelegram(b.label ?? '')
