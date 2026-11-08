@@ -6,7 +6,7 @@ What you schedule in Buffer also lands in your Telegram channel, your Discord se
 
 ## Who it is for
 
-Creators, small businesses and community managers who already schedule in Buffer and also keep a community in a Telegram channel or a Discord server. Telegram (1,452 votes), Discord (1,364) and Tumblr (1,328) are the 2nd, 3rd and 4th most requested channels on Buffer's own channel request board (suggestions.buffer.com, read 3 Nov 2026), all still "under review".
+Creators, small businesses and community managers who already schedule in Buffer and also keep a community in a Telegram channel or a Discord server. Telegram (1,452 votes), Discord (1,364) and Tumblr (1,328) are the 2nd, 3rd and 4th most requested channels on Buffer's own channel request board (suggestions.buffer.com, read 3 Nov 2026); none supported yet on 8 Nov.
 
 Typical person: a creator who batches the week's posts in Buffer on Sunday night, then forgets to paste the Instagram announcement into her Telegram channel and her Discord #announcements on Wednesday.
 

@@ -8,7 +8,7 @@ Built on the Buffer API for Buffer Commit 2026. Relaypost is an independent app;
 
 ## The problem
 
-Reddit, Telegram and Discord are the most requested channels on Buffer's own request board (3,008, 1,452 and 1,364 votes, read on 3 Nov 2026 at suggestions.buffer.com), all still under review. People who run a community there schedule the week in Buffer and then paste the same announcement into Telegram, Discord and Reddit by hand, or forget to.
+Reddit, Telegram and Discord are the most requested channels on Buffer's own request board (3,008, 1,452 and 1,364 votes, read on 3 Nov 2026 at suggestions.buffer.com), and on 8 Nov none of them was supported yet. People who run a community there schedule the week in Buffer and then paste the same announcement into Telegram, Discord and Reddit by hand, or forget to.
 
 ## Try it in a minute
 

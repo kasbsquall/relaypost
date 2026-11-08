@@ -75,6 +75,22 @@ describe('reconcile', () => {
     expect(second.every((r) => r.status === 'skipped')).toBe(true)
   })
 
+  it('hands off again when a post is untagged and tagged again before it publishes', () => {
+    const first = reconcile([], [post()], rules, window)
+    const untagged = reconcile(first, [post({ tags: [], channelId: 'ch-li' })], rules, window)
+    expect(untagged.every((r) => r.status === 'skipped')).toBe(true)
+    const tagged = reconcile(untagged, [post()], rules, window)
+    expect(tagged).toHaveLength(2)
+    expect(tagged.every((r) => r.status === 'waiting' && r.checkAt === T0 + FIRST_CHECK_DELAY_MS)).toBe(true)
+  })
+
+  it('keeps a skipped relay skipped once the post has been sent', () => {
+    const first = reconcile([], [post()], rules, window)
+    const untagged = reconcile(first, [], rules, window)
+    const sent = reconcile(untagged, [post({ status: 'sent' })], rules, window)
+    expect(sent.every((r) => r.status === 'skipped')).toBe(true)
+  })
+
   it('keeps a waiting relay when the read did not cover its dueAt', () => {
     const first = reconcile([], [post()], rules, window)
     const second = reconcile(first, [], rules, { start: T0 + 1, end: T0 + 2 })

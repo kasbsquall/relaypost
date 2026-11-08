@@ -529,9 +529,18 @@ async function onSync() {
 function trackSection() {
   const ids = ['track', 'history', 'rules', 'destinations']
   const update = () => {
+    // The section whose top passed the nav most recently; Rules and Destinations sit side by
+    // side with the same top, and the first of a tie wins.
     let current = ids[0]
-    for (const id of ids) if (document.getElementById(id).getBoundingClientRect().top < 140) current = id
-    if (innerHeight + scrollY >= document.documentElement.scrollHeight - 4) current = ids[ids.length - 1]
+    let best = -Infinity
+    for (const id of ids) {
+      const top = document.getElementById(id).getBoundingClientRect().top
+      if (top < 140 && top > best + 1) { current = id; best = top }
+    }
+    // At the very bottom the last section can never reach the top, so it counts as current;
+    // a page that does not scroll (a sheet open, a tall window) never counts as at the bottom.
+    const scrollable = document.documentElement.scrollHeight > innerHeight + 8
+    if (scrollable && scrollY > 0 && innerHeight + scrollY >= document.documentElement.scrollHeight - 4) current = ids[ids.length - 1]
     document.querySelectorAll('.nav a, .tabbar a').forEach((a) => {
       if (a.getAttribute('href') === `#${current}`) a.setAttribute('aria-current', 'true')
       else a.removeAttribute('aria-current')

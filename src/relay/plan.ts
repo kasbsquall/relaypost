@@ -89,6 +89,7 @@ export function reconcile(
 ): Relay[] {
   const byKey = new Map(existing.map((r) => [relayKey(r.postId, r.destinationId), r]))
   const seen = new Set<string>()
+  const revivedKeys = new Set<string>()
   const next: Relay[] = []
 
   for (const post of posts) {
@@ -98,7 +99,11 @@ export function reconcile(
       const key = relayKey(post.id, destinationId)
       seen.add(key)
       const prior = byKey.get(key)
-      if (prior && prior.status !== 'waiting') continue
+      // A relay skipped because the post stopped matching comes back when it matches again
+      // before Buffer publishes it (a tag removed and added again, a post moved back).
+      const revived = prior?.status === 'skipped' && post.status === 'scheduled'
+      if (prior && prior.status !== 'waiting' && !revived) continue
+      if (revived) revivedKeys.add(key)
       if (!prior && !dueAfterRule(post, dueAt, destinationId, rules)) {
         seen.delete(key)
         continue
@@ -123,7 +128,7 @@ export function reconcile(
   for (const relay of existing) {
     const key = relayKey(relay.postId, relay.destinationId)
     if (seen.has(key)) {
-      if (relay.status !== 'waiting') next.push(relay)
+      if (relay.status !== 'waiting' && !revivedKeys.has(key)) next.push(relay)
       continue
     }
     const covered = relay.dueAt >= window.start && relay.dueAt <= window.end
