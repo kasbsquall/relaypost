@@ -37,8 +37,10 @@ export function redditTitle(post: Pick<BufferPost, 'text' | 'channelService'>): 
 
 export function redditBody(post: Pick<BufferPost, 'text' | 'channelService' | 'externalLink' | 'assets'>, title: string): string {
   const parts: string[] = []
-  // A one-sentence post is all title; repeating it in the body reads as a mistake.
-  if (post.text.trim() !== title) parts.push(post.text.trim())
+  // The title is the post's first sentence; repeating it at the top of the body reads as a mistake.
+  const text = post.text.trim()
+  const rest = text.startsWith(title) ? text.slice(title.length).trim() : text
+  if (rest) parts.push(rest)
   const image = firstImage(post as BufferPost)
   if (image) parts.push(`Image: ${image}`)
   if (post.externalLink) parts.push(`Originally posted on ${serviceName(post.channelService)}: ${post.externalLink}`)

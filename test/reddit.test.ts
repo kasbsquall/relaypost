@@ -57,6 +57,11 @@ describe('Reddit drafts', () => {
     expect(body).toContain('Originally posted on Bluesky: https://bsky.app/profile/x/post/1')
   })
 
+  it('does not repeat the title at the top of the body', () => {
+    const p = post({ text: 'Doors open at nine tonight. Bring a friend.' })
+    expect(redditBody(p, redditTitle(p)).startsWith('Bring a friend.')).toBe(true)
+  })
+
   it('does not repeat a one-sentence post in the body', () => {
     const p = post({ text: 'Doors open at nine.' })
     expect(redditBody(p, redditTitle(p))).toBe('Originally posted on Bluesky: https://bsky.app/profile/x/post/1')

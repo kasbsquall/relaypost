@@ -603,7 +603,9 @@ export class AccountDO extends DurableObject<Env> {
   // A Reddit "handoff" is a draft ready the moment Buffer publishes; the person posts it.
   private async draftForReddit(relay: Relay, post: BufferPost, subreddit: string): Promise<Relay> {
     const draft = redditDraft(post, subreddit)
-    const lead = `Reddit draft ready for r/${subreddit}: "${draft.title}". Open it, check it and press Post: `
+    // A title that already ends a sentence gets no second full stop after the quote.
+    const stop = /[.!?…]$/.test(draft.title) ? '' : '.'
+    const lead = `Reddit draft ready for r/${subreddit}: "${draft.title}"${stop} Open it, check it and press Post: `
     const link = lead.length + draft.url.length <= NOTICE_MAX ? draft.url : `${this.appOrigin()}/#history`
     await this.notify(lead + link)
     return { ...relay, status: 'delivered', attempts: relay.attempts + 1, detail: `Draft ready for r/${subreddit}`, externalLink: post.externalLink, deliveredAt: Date.now(), messageLink: draft.url }

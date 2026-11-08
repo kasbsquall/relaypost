@@ -81,7 +81,7 @@ function landsPreview(kind, p, ch) {
   if (kind === 'reddit') {
     const firstLine = text.split('\n').map((l) => l.trim()).find(Boolean) ?? ''
     const title = (/^.{12,}?[.!?](?=\s|$)/.exec(firstLine)?.[0] ?? firstLine) || `New post from ${service}`
-    const body = text.trim() === title ? '' : text.trim()
+    const body = text.trim().startsWith(title) ? text.trim().slice(title.length).trim() : text.trim()
     return { note: 'A draft, not a post: it opens Reddit with this filled in, and you press Post. The link to the original is added once Buffer publishes.',
       html: `<div class="mock reddit"><p class="m-title">${esc(title)}</p>${body ? `<p class="m-text">${esc(body)}</p>` : ''}<p class="m-foot">Originally posted on ${esc(service)}: link once published</p></div>` }
   }

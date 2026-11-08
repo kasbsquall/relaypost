@@ -1,6 +1,6 @@
 # Relaypost
 
-What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, usually within 45 seconds of Buffer publishing it. For Reddit, it hands you a ready-to-post draft.
+What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, usually 45 to 50 seconds after its scheduled time. For Reddit, it hands you a ready-to-post draft.
 
 Live: https://relaypost.kevin2005-10.workers.dev
 
