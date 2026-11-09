@@ -3,6 +3,7 @@
 What you schedule in Buffer also lands in your Telegram channel, your Discord server and your Slack workspace, usually 45 to 50 seconds after its scheduled time. For Reddit, it hands you a ready-to-post draft.
 
 Live: https://relaypost.kevin2005-10.workers.dev
+Demo video (1:46, one real run on 8 Nov 2026): https://youtu.be/Mhzg3aifu3o
 
 Built on the Buffer API for Buffer Commit 2026. Relaypost is an independent app; it is not made or endorsed by Buffer.
 
